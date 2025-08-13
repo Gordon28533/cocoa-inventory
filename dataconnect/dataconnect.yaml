@@ -1,0 +1,12 @@
+specVersion: "v1beta"
+serviceId: "cocoa-inventory"
+location: "us-central1"
+schema:
+  source: "./schema"
+  datasource:
+    postgresql:
+      database: "fdcdb"
+      cloudSql:
+        instanceId: "cocoa-inventory-fdc"
+      # schemaValidation: "COMPATIBLE"
+connectorDirs: ["./connector"]
