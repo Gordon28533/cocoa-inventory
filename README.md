@@ -1,239 +1,246 @@
 # Cocoa Inventory Management System
 
-A comprehensive inventory management system built with React frontend and Node.js backend, designed for Cocoa Marketing Company to manage stock, requisitions, and user access control.
+A React + Node.js inventory and requisition system for Cocoa Marketing Company. The app includes role-based access control, inventory management, requisition approvals, fulfillment, audit logging, and a project-managed local MySQL workflow for development.
 
-## Features
+## Highlights
 
-- **User Authentication & Authorization**: Role-based access control (Admin, HOD, IT Manager, Account Manager, Stores, Staff)
-- **Inventory Management**: Add, edit, and track inventory items across different categories
-- **Requisition System**: Multi-step approval workflow for item requests
-- **Department Management**: Create and manage departments
-- **Audit Logging**: Track all system activities
-- **Stock Alerts**: Automatic low stock notifications
-- **Real-time Dashboard**: Live inventory status and user-friendly interface
+- Role-based authentication with JWT
+- Inventory create, edit, delete, and low-stock alerts
+- Multi-step requisition workflow with department and head-office approvals
+- Department and user administration
+- Audit log viewing for admin users
+- Deterministic frontend and backend test suites
+
+## Tech Stack
+
+- Frontend: React, React Router, React Testing Library
+- Backend: Express, MySQL, JWT, bcrypt
+- Tooling: ESLint, Node test runner, PowerShell dev scripts
 
 ## Prerequisites
 
-- Node.js 16+ 
-- MySQL 8.0+
-- npm or yarn
+- Node.js 18+
+- npm
+- MySQL 8.0 binaries installed in the default Windows path:
+  `C:\Program Files\MySQL\MySQL Server 8.0\bin`
 
 ## Installation
 
-### 1. Clone the Repository
-```bash
-git clone <your-repo-url>
-cd cocoa-inventory
-```
+### 1. Install dependencies
 
-### 2. Install Dependencies
 ```bash
-# Install frontend dependencies
 npm install
-
-# Install backend dependencies
-cd Backend
-npm install
-cd ..
 ```
 
-### 3. Database Setup
-```sql
--- Create database
-CREATE DATABASE cocoa_inventory;
+### 2. Configure environment variables
 
--- Import schema
-mysql -u your_username -p cocoa_inventory < database_schema_update.sql
-```
+Create a `.env` file in the project root.
 
-### 4. Environment Configuration
-Copy the `.env.example` file to `.env` and update the values:
-```bash
-cp .env.example .env
-```
-
-Then edit the `.env` file with your specific configuration:
 ```env
-# Database Configuration
-DB_HOST=localhost
-DB_USER=your_db_user
-DB_PASS=your_db_password
-DB_NAME=cocoa_inventory
-
-# JWT Configuration
-JWT_SECRET=your_super_secure_jwt_secret_key_here
-
-# Server Configuration
+DB_HOST=127.0.0.1
+DB_USER=root
+DB_PASS=your_password
+DB_NAME=CMC_Inventory
+JWT_SECRET=replace_this_in_real_environments
 PORT=5000
 NODE_ENV=development
 ```
 
-> **IMPORTANT**: Never commit your `.env` file to version control. It contains sensitive information.
+Notes:
 
-### 5. Build Frontend
+- `npm run db:start` will create and seed `CMC_Inventory` automatically on first run.
+- `Backend/server.js` loads `.env` from the project root.
+
+## Local development
+
+### Recommended workflow
+
 ```bash
-npm run build
-```
-
-## Available Scripts
-
-### Development
-```bash
-# Start frontend development server
-npm start
-
-# Start backend server
-npm run start-backend
-
-# Run both frontend and backend
 npm run dev
 ```
 
-### Production
-```bash
-# Build for production
-npm run build
+This command:
 
-# Start production server
+- stops stale project frontend/backend processes on ports `3000` and `5000`
+- starts the project-managed local MySQL instance
+- starts the React frontend on `http://localhost:3000`
+- starts the backend on `http://localhost:5000`
+
+### Individual commands
+
+```bash
+# Start the local MySQL instance and seed the database if needed
+npm run db:start
+
+# Stop the local MySQL instance
+npm run db:stop
+
+# Start the React dev server
+npm start
+
+# Start the backend server
 npm run start-backend
-
-# Build and deploy
-npm run build-and-deploy
 ```
 
-### Testing
-```bash
-# Run frontend tests
-npm test
+### Seeded development login
 
-# Run backend tests (requires server running)
-npm run test:backend
-```
+When the local database is initialized from `scripts/init-dev-db.sql`, the default seeded admin account is:
 
-### Code Quality
-```bash
-# Lint and fix code
-npm run lint
-```
-
-## Project Structure
-
-```
-cocoa-inventory/
-├── .github/                # GitHub configuration
-│   └── workflows/          # GitHub Actions workflows
-├── Backend/                # Node.js backend server
-│   ├── server.js           # Main server file
-│   └── *.test.js           # Backend tests
-├── src/
-│   ├── Component/          # React components
-│   ├── Pages/              # Page components
-│   ├── data/               # Static data files
-│   └── styles.css          # Global styles
-├── public/                 # Static assets
-├── scripts/                # Deployment scripts
-├── .env.example            # Example environment variables
-├── CODE_OF_CONDUCT.md      # Community standards
-├── CONTRIBUTING.md         # Contribution guidelines
-└── database_schema_update.sql  # Database schema
-```
-
-## API Endpoints
-
-### Authentication
-- `POST /login` - User login
-- `GET /health` - Health check
-
-### Users (Admin Only)
-- `GET /users` - List all users
-- `POST /users` - Create user
-- `PUT /users/:id` - Update user
-- `DELETE /users/:id` - Delete user
-
-### Inventory
-- `GET /items` - List all inventory items
-- `POST /items` - Add new item
-- `PUT /items/:id` - Update item quantity
-
-### Requisitions
-- `POST /requisitions` - Create requisition
-- `GET /requisitions` - List requisitions
-- `PUT /requisitions/:id/approve` - Approve requisition
-- `PUT /requisitions/:id/fulfill` - Fulfill requisition
-
-### Departments
-- `GET /departments` - List departments
-- `POST /departments` - Create department
-- `PUT /departments/:id` - Update department
-- `DELETE /departments/:id` - Delete department
-
-## User Roles
-
-- **Admin**: Full system access, user management, audit logs
-- **HOD**: Approve requisitions for their department
-- **IT Manager**: Approve IT-related requisitions
-- **Account Manager**: Final approval for non-IT items
-- **Stores**: Fulfill approved requisitions
-- **Staff**: Create requisitions, view inventory
+- `staffName`: `admin`
+- `password`: `admin123`
 
 ## Testing
 
-The project includes comprehensive tests for both frontend and backend:
+### Frontend
 
-- **Frontend Tests**: React components and user interactions
-- **Backend Tests**: API endpoints and authentication
-- **Integration Tests**: End-to-end functionality
-
-Run tests with:
 ```bash
 npm test
 ```
 
-## Deployment
+For a one-shot run in CI style on Windows:
 
-See [DEPLOYMENT.md](./DEPLOYMENT.md) for detailed deployment instructions.
-
-### Quick Deployment
 ```bash
-# Use deployment script
-./deploy.sh
-
-# Or on Windows
-deploy.bat
+cmd /c "set CI=true&& npm test -- --watch=false"
 ```
 
-## Security Features
+### Backend
 
-- JWT-based authentication
-- Role-based access control
-- Input validation and sanitization
-- Rate limiting on login attempts
-- Secure error handling
-- Environment variable protection
+```bash
+npm run test:backend
+```
 
-## Contributing
+Backend tests run in-process against the app factory in [Backend/app.js](/C:/Users/PC/cocoa-inventory/Backend/app.js). They do not require a separately running server.
 
-Please see [CONTRIBUTING.md](./CONTRIBUTING.md) for detailed contribution guidelines.
+## Build and quality checks
 
-We also have a [Code of Conduct](./CODE_OF_CONDUCT.md) that we expect all contributors to follow.
+```bash
+# Frontend + backend lint
+npm run lint
 
-### GitHub Integration
+# Backend syntax validation
+npm run check:backend
 
-This project uses GitHub Actions for continuous integration and deployment:
+# Startup smoke check
+npm run smoke:startup
 
-- **Automated Testing**: All pull requests and pushes to the main branch are automatically tested
-- **Automated Deployment**: Changes to the main branch are automatically deployed to the production server
-- **Code Quality Checks**: Linting and code style checks are performed automatically
+# Production build
+npm run build
+```
 
-To set up GitHub Actions for deployment, you need to configure the following secrets in your GitHub repository:
-- `HOST`: The hostname or IP address of your deployment server
-- `USERNAME`: The SSH username for your deployment server
-- `SSH_KEY`: The private SSH key for authentication
+Additional scoped scripts:
 
-## License
+- `npm run lint:frontend`
+- `npm run lint:backend`
+- `node scripts/smoke-startup.mjs --url http://127.0.0.1:5000 --staff-name admin --password admin123`
 
-This project is proprietary software for Cocoa Marketing Company.
+## Project structure
 
-## Support
+```text
+cocoa-inventory/
+|-- Backend/
+|   |-- app.js
+|   |-- server.js
+|   |-- lib/
+|   |-- routes/
+|   `-- *.test.js
+|-- public/
+|-- scripts/
+|   |-- init-prod-db.sql
+|   |-- init-dev-db.sql
+|   |-- start-dev.ps1
+|   |-- start-local-db.ps1
+|   `-- stop-local-db.ps1
+|-- src/
+|   |-- Component/
+|   |   `-- ui/
+|   |-- Context/
+|   |-- Pages/
+|   `-- utils/
+|-- README.md
+`-- package.json
+```
 
-For support and questions, contact the development team.
+## Core roles
+
+- `admin`: full access, user management, departments, audit logs, inventory
+- `user`: submits requisitions and views personal requisitions
+- `account`: branch account approval for non-head-office requisitions
+- `hod`: department approval
+- `deputy_hod`: same approval step as HOD
+- `it_manager`: IT approval after HOD for IT requisitions
+- `account_manager`: head-office account approval
+- `stores`: inventory operations and requisition fulfillment
+
+## Approval workflow summary
+
+- Branch non-head-office flow:
+  `pending -> branch_account_approved -> ho_account_approved -> fulfilled`
+- Non-IT departmental flow:
+  `pending -> hod_approved -> account_approved -> fulfilled`
+- IT departmental flow:
+  `pending -> hod_approved -> it_approved -> account_approved -> fulfilled`
+
+The backend enforces department scoping, mixed-status batch rejection, and stores-only fulfillment.
+
+## API overview
+
+Main endpoints are mounted at the backend root, not under `/api`.
+
+### Auth
+
+- `POST /login`
+- `GET /auth/validate`
+- `POST /change-password`
+- `GET /me`
+- `GET /health`
+
+### Users and audit
+
+- `GET /users`
+- `POST /users`
+- `PUT /users/:id`
+- `DELETE /users/:id`
+- `PATCH /users/:id/deactivate`
+- `GET /audit-logs`
+
+### Inventory
+
+- `GET /items`
+- `POST /items`
+- `PUT /items/:id`
+- `DELETE /items/:id`
+
+### Departments
+
+- `GET /departments`
+- `POST /departments`
+- `PUT /departments/:id`
+- `DELETE /departments/:id`
+
+### Requisitions
+
+- `POST /requisitions`
+- `GET /requisitions`
+- `PUT /requisitions/:id/approve`
+- `PUT /requisitions/:id/fulfill`
+- `PUT /requisitions/batch/:batch_id/fulfill`
+- `GET /requisitions/code/:code`
+
+For the fuller request/response and role contract, see [docs/api-contract.md](/C:/Users/PC/cocoa-inventory/docs/api-contract.md).
+
+## Deployment
+
+- `npm run build`
+- `npm run start-backend`
+
+The backend serves the production React build from `build/` when started through [Backend/server.js](/C:/Users/PC/cocoa-inventory/Backend/server.js).
+
+Production helpers:
+
+- [ecosystem.config.cjs](/C:/Users/PC/cocoa-inventory/ecosystem.config.cjs) for PM2
+- [smoke-startup.mjs](/C:/Users/PC/cocoa-inventory/scripts/smoke-startup.mjs) for `/health` and optional login smoke checks
+
+## Notes
+
+- The local DB bootstrap is designed for Windows development environments.
+- The build may show a non-blocking Browserslist age warning until its data is refreshed.

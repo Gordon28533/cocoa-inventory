@@ -13,11 +13,16 @@
 
 # misc
 .DS_Store
+.idea/
+.vscode/*.log
+*.tmp
+*.bak
 .env
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
+*.session.sql
 
 npm-debug.log*
 yarn-debug.log*

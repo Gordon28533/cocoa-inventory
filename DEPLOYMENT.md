@@ -1,280 +1,208 @@
-# Cocoa Inventory System - Deployment Guide
+# Deployment Guide
+
+This guide reflects the current application layout and startup flow in:
+
+- [Backend/server.js](/C:/Users/PC/cocoa-inventory/Backend/server.js)
+- [Backend/app.js](/C:/Users/PC/cocoa-inventory/Backend/app.js)
+
+## What gets deployed
+
+- the built React frontend from `build/`
+- the Express backend from `Backend/`
+- a MySQL database
+- a root-level `.env` file
+
+The backend serves the frontend build in production.
 
 ## Prerequisites
-- Node.js 16+ installed on server
-- MySQL 8.0+ installed and running
-- Git (for code deployment)
-- PM2 (for process management)
 
-## Step 1: Server Setup
+- Node.js 18+
+- npm
+- MySQL 8+
+- A process manager such as PM2
+- A reverse proxy such as Nginx or Apache for HTTPS
 
-### Install Node.js and PM2
+## 1. Copy the project
+
 ```bash
-# Install Node.js (if not already installed)
-# Download from https://nodejs.org/
-
-# Install PM2 globally
-npm install -g pm2
-```
-
-### Install MySQL
-```bash
-# Ubuntu/Debian
-sudo apt update
-sudo apt install mysql-server
-
-# CentOS/RHEL
-sudo yum install mysql-server
-
-# Windows
-# Download MySQL installer from https://dev.mysql.com/downloads/
-```
-
-## Step 2: Database Setup
-
-### Create Database and User
-```sql
--- Connect to MySQL as root
-mysql -u root -p
-
--- Create database
-CREATE DATABASE cocoa_inventory_prod;
-
--- Create user (replace with secure password)
-CREATE USER 'cocoa_user'@'localhost' IDENTIFIED BY 'your_secure_password';
-
--- Grant permissions
-GRANT ALL PRIVILEGES ON cocoa_inventory_prod.* TO 'cocoa_user'@'localhost';
-FLUSH PRIVILEGES;
-
--- Exit MySQL
-EXIT;
-```
-
-### Import Database Schema
-```bash
-mysql -u cocoa_user -p cocoa_inventory_prod < database_schema_update.sql
-```
-
-## Step 3: Application Deployment
-
-### Clone/Upload Code
-```bash
-# Option 1: Git clone
 git clone <your-repo-url> /opt/cocoa-inventory
 cd /opt/cocoa-inventory
-
-# Option 2: Upload files manually to /opt/cocoa-inventory
 ```
 
-### Create Production Environment File
+## 2. Install dependencies
+
+```bash
+npm ci
+```
+
+There is a single root `package.json`. You do not need a separate `npm install` inside `Backend/`.
+
+## 3. Configure environment variables
+
 Create `/opt/cocoa-inventory/.env`:
+
 ```env
-# Production Environment Variables
-DB_HOST=localhost
+DB_HOST=127.0.0.1
 DB_USER=cocoa_user
-DB_PASS=your_secure_password
-DB_NAME=cocoa_inventory_prod
-JWT_SECRET=your_super_secure_jwt_secret_key_here_make_it_long_and_random
+DB_PASS=replace_with_secure_password
+DB_NAME=CMC_Inventory
+JWT_SECRET=replace_with_a_long_random_secret
 PORT=5000
 NODE_ENV=production
 ```
 
-### Install Dependencies and Build
+Notes:
+
+- `Backend/server.js` loads `.env` from the project root.
+- Use a strong `JWT_SECRET`.
+- In production, point these values at your managed MySQL instance. Do not use the local Windows dev bootstrap flow.
+- Start from [.env.example](/C:/Users/PC/cocoa-inventory/.env.example) when creating the file.
+
+## 4. Prepare the database
+
+Create the production database and user in MySQL:
+
+```sql
+CREATE DATABASE CMC_Inventory CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER 'cocoa_user'@'localhost' IDENTIFIED BY 'replace_with_secure_password';
+GRANT ALL PRIVILEGES ON CMC_Inventory.* TO 'cocoa_user'@'localhost';
+FLUSH PRIVILEGES;
+```
+
+Then import your schema and seed strategy.
+
+Recommended options:
+
+- use [init-prod-db.sql](/C:/Users/PC/cocoa-inventory/scripts/init-prod-db.sql) for a production-safe bootstrap
+- use [init-dev-db.sql](/C:/Users/PC/cocoa-inventory/scripts/init-dev-db.sql) only as a development reference
+- or provision schema via your database migration/release process
+
+Important:
+
+- the dev SQL file includes a seeded admin account and sample data
+- do not apply development seed credentials in production
+- legacy root-level SQL files are deprecated placeholders and should not be used for new setups
+
+Example import:
+
+```bash
+mysql -u cocoa_user -p CMC_Inventory < scripts/init-prod-db.sql
+```
+
+## 5. Build the frontend
+
+```bash
+npm run build
+```
+
+## 6. Preflight checks
+
+Run the checks before starting the service:
+
+```bash
+npm run lint
+npm run check:backend
+npm run test:backend
+```
+
+Optional frontend CI-style test run:
+
+```bash
+CI=true npm test -- --watch=false
+```
+
+## 7. Start the backend
+
+### With PM2
+
 ```bash
 cd /opt/cocoa-inventory
-
-# Install frontend dependencies
-npm install
-
-# Build frontend for production
-npm run build
-
-# Install backend dependencies
-cd Backend
-npm install
-```
-
-## Step 4: Start Application with PM2
-
-### Start Backend
-```bash
-cd /opt/cocoa-inventory/Backend
-
-# Start with PM2
-pm2 start server.js --name cocoa-backend --env production
-
-# Save PM2 configuration
+pm2 start ecosystem.config.cjs
 pm2 save
-pm2 startup
 ```
 
-### Verify Application
+Useful PM2 commands:
+
 ```bash
-# Check if backend is running
 pm2 status
-
-# Check logs
-pm2 logs cocoa-backend
-
-# Test API endpoint
-curl http://localhost:5000/health
+pm2 logs cocoa-inventory
+pm2 restart cocoa-inventory
 ```
 
-## Step 5: Network Configuration
+The repository includes a ready-to-use PM2 config in [ecosystem.config.cjs](/C:/Users/PC/cocoa-inventory/ecosystem.config.cjs).
 
-### Firewall Setup (Ubuntu/Debian)
+## 8. Verify the deployment
+
+Health check:
+
 ```bash
-# Allow HTTP and HTTPS
-sudo ufw allow 80
-sudo ufw allow 443
-sudo ufw allow 5000
-
-# Enable firewall
-sudo ufw enable
+curl http://127.0.0.1:5000/health
 ```
 
-### Firewall Setup (CentOS/RHEL)
+Expected shape:
+
+```json
+{
+  "status": "ok",
+  "database": "connected",
+  "timestamp": "2026-04-09T10:32:02.928Z"
+}
+```
+
+Optional smoke checks:
+
 ```bash
-# Allow HTTP and HTTPS
-sudo firewall-cmd --permanent --add-port=80/tcp
-sudo firewall-cmd --permanent --add-port=443/tcp
-sudo firewall-cmd --permanent --add-port=5000/tcp
+# Health only
+npm run smoke:startup
 
-# Reload firewall
-sudo firewall-cmd --reload
+# Health plus login
+node scripts/smoke-startup.mjs --url http://127.0.0.1:5000 --staff-name admin --password your_password
 ```
 
-### DNS Configuration
-Add an A record in your company DNS:
-```
-inventory.company.local  A  <your-server-ip>
-```
+## 9. Put a reverse proxy in front
 
-## Step 6: SSL/HTTPS Setup (Recommended)
+Example Nginx configuration:
 
-### Install Certbot (Let's Encrypt)
-```bash
-# Ubuntu/Debian
-sudo apt install certbot
-
-# CentOS/RHEL
-sudo yum install certbot
-```
-
-### Generate SSL Certificate
-```bash
-sudo certbot certonly --standalone -d inventory.company.local
-```
-
-### Configure Nginx (Optional)
-If using Nginx as reverse proxy:
 ```nginx
 server {
     listen 80;
-    server_name inventory.company.local;
+    server_name inventory.example.com;
     return 301 https://$server_name$request_uri;
 }
 
 server {
     listen 443 ssl;
-    server_name inventory.company.local;
-    
-    ssl_certificate /etc/letsencrypt/live/inventory.company.local/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/inventory.company.local/privkey.pem;
-    
+    server_name inventory.example.com;
+
+    ssl_certificate /etc/letsencrypt/live/inventory.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/inventory.example.com/privkey.pem;
+
     location / {
-        proxy_pass http://localhost:5000;
+        proxy_pass http://127.0.0.1:5000;
         proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_cache_bypass $http_upgrade;
     }
 }
 ```
 
-## Step 7: Initial User Setup
+## 10. Operational notes
 
-### Create Admin User
-```sql
--- Connect to MySQL
-mysql -u cocoa_user -p cocoa_inventory_prod
+- `/health` is the simplest readiness check
+- `scripts/smoke-startup.mjs` is the quickest post-deploy smoke test
+- backend routes are mounted at the root, not under `/api`
+- authenticated frontend requests expect the backend at `REACT_APP_API_URL` or `http://localhost:5000`
+- if the database is unavailable, DB-backed routes return `503`
 
--- Insert admin user (password will be 'admin123')
-INSERT INTO users (staffName, staffId, password, role) 
-VALUES ('admin', 'ADMIN001', '$2b$10$your_hashed_password_here', 'admin');
+## Production checklist
 
--- Exit MySQL
-EXIT;
-```
-
-### Or use the application
-1. Access http://inventory.company.local
-2. Login with test credentials
-3. Use admin panel to create users
-
-## Step 8: Monitoring and Maintenance
-
-### PM2 Monitoring
-```bash
-# Monitor application
-pm2 monit
-
-# View logs
-pm2 logs cocoa-backend
-
-# Restart application
-pm2 restart cocoa-backend
-```
-
-### Database Backup
-```bash
-# Create backup script
-cat > /opt/cocoa-inventory/backup.sh << 'EOF'
-#!/bin/bash
-DATE=$(date +%Y%m%d_%H%M%S)
-mysqldump -u cocoa_user -p'your_password' cocoa_inventory_prod > /opt/backups/cocoa_inventory_$DATE.sql
-find /opt/backups -name "cocoa_inventory_*.sql" -mtime +7 -delete
-EOF
-
-# Make executable
-chmod +x /opt/cocoa-inventory/backup.sh
-
-# Add to crontab for daily backup
-crontab -e
-# Add line: 0 2 * * * /opt/cocoa-inventory/backup.sh
-```
-
-## Troubleshooting
-
-### Common Issues
-1. **Port 5000 not accessible**: Check firewall settings
-2. **Database connection failed**: Verify MySQL is running and credentials are correct
-3. **PM2 not starting**: Check logs with `pm2 logs cocoa-backend`
-4. **Frontend not loading**: Ensure `npm run build` completed successfully
-
-### Useful Commands
-```bash
-# Check if port is in use
-netstat -tulpn | grep :5000
-
-# Check MySQL status
-sudo systemctl status mysql
-
-# Check PM2 status
-pm2 status
-
-# View application logs
-pm2 logs cocoa-backend --lines 100
-```
-
-## Security Considerations
-- Use strong passwords for database and JWT secret
-- Regularly update dependencies
-- Monitor logs for suspicious activity
-- Consider using HTTPS even for internal networks
-- Restrict database access to application server only 
+- set a strong `JWT_SECRET`
+- use a dedicated production MySQL user
+- disable or remove demo seed users
+- restrict database access to the application host
+- terminate TLS at the reverse proxy
+- monitor PM2 logs and health checks
+- back up MySQL regularly
+- keep dependencies and Browserslist data current

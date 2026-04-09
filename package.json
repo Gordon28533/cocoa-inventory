@@ -17,6 +17,7 @@
     "mongoose": "^7.5.0",
     "morgan": "^1.10.0",
     "mysql2": "^3.6.0",
+    "prop-types": "^15.8.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.15.0",
@@ -24,14 +25,22 @@
     "web-vitals": "^2.1.4"
   },
   "scripts": {
-    "lint": "eslint src --fix",
-    "start": "set BROWSER=chrome&&react-scripts start",
+    "db:start": "powershell -ExecutionPolicy Bypass -File scripts/start-local-db.ps1",
+    "db:stop": "powershell -ExecutionPolicy Bypass -File scripts/stop-local-db.ps1",
+    "lint": "eslint src Backend",
+    "lint:frontend": "eslint src",
+    "lint:backend": "eslint Backend",
+    "lint:fix": "eslint src --fix",
+    "check:backend": "powershell -ExecutionPolicy Bypass -File scripts/check-backend.ps1",
+    "smoke:startup": "node scripts/smoke-startup.mjs",
+    "start": "set PORT=3000&& set BROWSER=chrome&&react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
+    "test:backend": "node --test Backend/*.test.js",
     "eject": "react-scripts eject",
-    "start-backend": "node Backend/server.js",
+    "start-backend": "npm run db:start && node Backend/server.js",
     "build-and-deploy": "npm run build && npm run start-backend",
-    "dev": "concurrently \"npm run start\" \"npm run start-backend\""
+    "dev": "powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1"
   },
   "rules": {
     "react/jsx-no-target-blank": "off"
@@ -53,6 +62,7 @@
     "concurrently": "^9.2.0",
     "eslint": "^8.57.1",
     "eslint-plugin-react": "^7.37.4",
+    "eslint-plugin-react-hooks": "^5.2.0",
     "globals": "^16.0.0"
   }
 }

@@ -1,33 +1,17 @@
 {
-    "cSpell.words": [
-        "noreferrer",
-        "firebaseapp",
-        "cocoamarketing",
-        "firebasegen",
-        "noopener",
-        "Anwb",
-        "Ndkym",
-        "firebasestorage",
-        "Hxho",
-        "YCWCSQPG",
-        "Firestore",
-        "appspot"
-    ],
-    "terminal.integrated.focusAfterRun": "terminal",
-    "sqltools.connections": [
-        {
-            "mysqlOptions": {
-                "authProtocol": "default",
-                "enableSsl": "Disabled"
-            },
-            "previewLimit": 50,
-            "server": "localhost",
-            "port": 3306,
-            "driver": "MySQL",
-            "name": "CMC_Inventory",
-            "username": "root",
-            "database": "CMC_Inventory",
-            "connectionTimeout": 30
-        }
-    ]
+  "cSpell.words": [
+    "noreferrer",
+    "firebaseapp",
+    "cocoamarketing",
+    "firebasegen",
+    "noopener",
+    "Anwb",
+    "Ndkym",
+    "firebasestorage",
+    "Hxho",
+    "YCWCSQPG",
+    "Firestore",
+    "appspot"
+  ],
+  "terminal.integrated.focusAfterRun": "terminal"
 }
