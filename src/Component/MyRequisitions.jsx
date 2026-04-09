@@ -1,289 +1,383 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import PropTypes from "prop-types";
+import { useDepartments } from "../Context/DepartmentsContext.js";
+import { api } from "../utils/api.js";
+import { getBatchStatusMeta } from "../utils/requisitionStatus.js";
+
+const PAGE_SIZES = [5, 10, 20];
+
+const normalizeText = (value) => String(value || "").trim().toLowerCase();
+
+const getOldestCreatedAt = (batch) =>
+  batch.reduce(
+    (oldest, requisition) =>
+      new Date(requisition.created_at).getTime() < new Date(oldest).getTime() ? requisition.created_at : oldest,
+    batch[0]?.created_at || ""
+  );
+
+const groupByBatchId = (requisitions) =>
+  requisitions.reduce((groups, requisition) => {
+    const existingBatch = groups.get(requisition.batch_id) || [];
+    existingBatch.push(requisition);
+    groups.set(requisition.batch_id, existingBatch);
+    return groups;
+  }, new Map());
+
+const sortBatchItems = (batch, inventoryMap, sortConfig) => {
+  const sortedBatch = [...batch];
+  const direction = sortConfig.direction === "asc" ? 1 : -1;
+
+  sortedBatch.sort((left, right) => {
+    const leftDetails = inventoryMap.get(left.item_id) || {};
+    const rightDetails = inventoryMap.get(right.item_id) || {};
+
+    const values = {
+      item: [leftDetails.name || left.item_id, rightDetails.name || right.item_id],
+      category: [leftDetails.category || "", rightDetails.category || ""],
+      type: [leftDetails.type || "", rightDetails.type || ""],
+      quantity: [Number(left.quantity) || 0, Number(right.quantity) || 0],
+      status: [left.status || "", right.status || ""]
+    };
+
+    const [leftValue, rightValue] = values[sortConfig.key] || values.item;
+
+    if (leftValue < rightValue) return -1 * direction;
+    if (leftValue > rightValue) return 1 * direction;
+    return 0;
+  });
+
+  return sortedBatch;
+};
+
+const exportBatchToCsv = (batch, inventoryMap) => {
+  if (!batch.length) {
+    return;
+  }
+
+  const headers = ["Batch ID", "Item", "Category", "Type", "Quantity", "Status"];
+  const rows = batch.map((requisition) => {
+    const details = inventoryMap.get(requisition.item_id) || {};
+
+    return [
+      requisition.batch_id,
+      details.name || requisition.item_id,
+      details.category || "",
+      details.type || "",
+      requisition.quantity,
+      requisition.status
+    ];
+  });
+
+  const csvContent = `${headers.join(",")}\n${rows
+    .map((row) => row.map((value) => `"${String(value).replace(/"/g, '""')}"`).join(","))
+    .join("\n")}`;
+
+  const blob = new Blob([csvContent], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `my-requisitions-${batch[0].batch_id}.csv`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+};
 
 const MyRequisitions = ({ inventory }) => {
+  const { departments } = useDepartments();
   const [requisitions, setRequisitions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const token = localStorage.getItem("token");
-  const userId = JSON.parse(atob(localStorage.getItem("token").split('.')[1])).id;
-  const [filterStatus, setFilterStatus] = useState('');
-  const [search, setSearch] = useState('');
-  const [sortKey, setSortKey] = useState('created_at');
-  const [sortAsc, setSortAsc] = useState(false);
+  const [statusFilter, setStatusFilter] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [itemSort, setItemSort] = useState({ key: "item", direction: "asc" });
   const [page, setPage] = useState(1);
-  const [batchesPerPage, setBatchesPerPage] = useState(5);
-  const [departments, setDepartments] = useState([]);
+  const [pageSize, setPageSize] = useState(PAGE_SIZES[0]);
 
   useEffect(() => {
-    fetchMine();
-    // Fetch departments
-    const fetchDepartments = async () => {
+    let isMounted = true;
+
+    const loadRequisitions = async () => {
+      setLoading(true);
+      setError("");
+
       try {
-        const token = localStorage.getItem("token");
-        const res = await fetch("http://localhost:5000/departments", {
-          headers: { Authorization: "Bearer " + token }
-        });
-        if (res.ok) setDepartments(await res.json());
-      } catch {}
+        const data = await api.getRequisitions();
+
+        if (isMounted) {
+          setRequisitions(Array.isArray(data) ? data : []);
+        }
+      } catch (requestError) {
+        if (isMounted) {
+          setError(requestError.message || "Unable to load your requisitions.");
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
     };
-    fetchDepartments();
-    // eslint-disable-next-line
+
+    loadRequisitions();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
-  const fetchMine = async () => {
-    setLoading(true);
-    setError("");
-    try {
-      const res = await fetch("http://localhost:5000/requisitions", {
-        headers: { Authorization: "Bearer " + token }
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setRequisitions(data.filter(r => r.requested_by === userId));
-      } else {
-        setError(data.error || "Failed to fetch requisitions.");
-      }
-    } catch (err) {
-      setError("Server error.");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const inventoryMap = useMemo(
+    () => new Map(inventory.map((item) => [String(item.id), item])),
+    [inventory]
+  );
 
-  // Group by batch_id
-  const batches = {};
-  requisitions.forEach(req => {
-    if (!batches[req.batch_id]) batches[req.batch_id] = [];
-    batches[req.batch_id].push(req);
-  });
+  const departmentMap = useMemo(
+    () => new Map(departments.map((department) => [String(department.id), department.name])),
+    [departments]
+  );
 
-  const getItemDetails = (id) => {
-    const item = inventory.find(i => i.id === id);
-    return item ? { name: item.name, category: item.category, type: item.type } : { name: id, category: '', type: '' };
-  };
+  const statusOptions = useMemo(
+    () => Array.from(new Set(requisitions.map((requisition) => requisition.status).filter(Boolean))).sort(),
+    [requisitions]
+  );
 
-  const getDeptName = (id) => {
-    const dept = departments.find(d => String(d.id) === String(id));
-    return dept ? dept.name : id;
-  };
+  const batchList = useMemo(() => {
+    const grouped = Array.from(groupByBatchId(requisitions).values());
+    const normalizedQuery = normalizeText(searchQuery);
 
-  const getBatchStatus = (batch) => {
-    const statuses = batch.map(r => r.status);
-    if (statuses.every(s => s === 'fulfilled')) return { label: 'Fulfilled', icon: '✅', color: '#28a745' };
-    if (statuses.every(s => s === 'account_approved')) return { label: 'Approved', icon: '✔️', color: '#1976d2' };
-    if (statuses.every(s => s === 'pending')) return { label: 'Pending', icon: '⏳', color: '#ffc107' };
-    if (statuses.some(s => s === 'rejected')) return { label: 'Rejected', icon: '❌', color: '#dc3545' };
-    return { label: 'In Progress', icon: '🔄', color: '#888' };
-  };
+    return grouped
+      .filter((batch) => {
+        const batchStatus = getBatchStatusMeta(batch);
 
-  const exportBatchToCSV = (batch) => {
-    const headers = ['Item', 'Category', 'Type', 'Quantity', 'Status'];
-    const rows = batch.map(req => {
-      const details = getItemDetails(req.item_id);
-      return [details.name, details.category, details.type, req.quantity, req.status];
-    });
-    let csvContent = headers.join(',') + '\n' + rows.map(r => r.map(x => '"' + String(x).replace(/"/g, '""') + '"').join(',')).join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `my_batch_${batch[0].batch_id}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  };
+        if (statusFilter && !batch.some((item) => item.status === statusFilter)) {
+          return false;
+        }
 
-  if (loading) return <div>Loading...</div>;
-  if (error) return <div style={{ color: 'red' }}>{error}</div>;
+        if (!normalizedQuery) {
+          return true;
+        }
 
-  // Filtering and searching
-  let batchList = Object.values(batches);
-  if (filterStatus) {
-    batchList = batchList.filter(batch => batch.some(r => r.status === filterStatus));
-  }
-  if (search) {
-    batchList = batchList.filter(batch =>
-      batch[0].batch_id.toLowerCase().includes(search.toLowerCase()) ||
-      batch.some(r => {
-        const details = getItemDetails(r.item_id);
-        return details.name.toLowerCase().includes(search.toLowerCase());
+        const departmentName = departmentMap.get(String(batch[0].department_id)) || String(batch[0].department_id || "");
+        const searchableValues = [
+          batch[0].batch_id,
+          batch[0].unique_code,
+          batchStatus.label,
+          departmentName,
+          ...batch.flatMap((item) => {
+            const details = inventoryMap.get(String(item.item_id)) || {};
+            return [item.status, details.name, details.category, details.type];
+          })
+        ];
+
+        return searchableValues.some((value) => normalizeText(value).includes(normalizedQuery));
       })
-    );
-  }
-  // Sorting
-  if (sortKey) {
-    batchList.sort((a, b) => {
-      let valA, valB;
-      if (sortKey === 'created_at') {
-        valA = a.reduce((min, r) => r.created_at < min ? r.created_at : min, a[0].created_at);
-        valB = b.reduce((min, r) => r.created_at < min ? r.created_at : min, b[0].created_at);
-      } else {
-        valA = a[0][sortKey] || '';
-        valB = b[0][sortKey] || '';
-      }
-      if (valA < valB) return sortAsc ? -1 : 1;
-      if (valA > valB) return sortAsc ? 1 : -1;
-      return 0;
-    });
-  }
-  const allStatuses = Array.from(new Set(requisitions.map(r => r.status))).filter(Boolean);
+      .sort((leftBatch, rightBatch) => new Date(getOldestCreatedAt(rightBatch)) - new Date(getOldestCreatedAt(leftBatch)));
+  }, [departmentMap, inventoryMap, requisitions, searchQuery, statusFilter]);
 
-  // Pagination
-  const totalPages = Math.ceil(batchList.length / batchesPerPage);
-  const paginatedBatches = batchList.slice((page - 1) * batchesPerPage, page * batchesPerPage);
-  const startIdx = (page - 1) * batchesPerPage + 1;
-  const endIdx = Math.min(page * batchesPerPage, batchList.length);
+  const totalPages = Math.max(1, Math.ceil(batchList.length / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const visibleBatches = batchList.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const rangeStart = batchList.length ? (currentPage - 1) * pageSize + 1 : 0;
+  const rangeEnd = Math.min(currentPage * pageSize, batchList.length);
+
+  useEffect(() => {
+    setPage((current) => Math.min(current, totalPages));
+  }, [totalPages]);
+
+  const handleSortChange = (key) => {
+    setItemSort((current) => ({
+      key,
+      direction: current.key === key && current.direction === "asc" ? "desc" : "asc"
+    }));
+  };
+
+  if (loading) {
+    return <div>Loading your requisitions...</div>;
+  }
+
+  if (error) {
+    return <div style={{ color: "red" }}>{error}</div>;
+  }
 
   return (
-    <div style={{ margin: 24 }}>
-      <h2 style={{ marginBottom: 24 }}>My Requisitions</h2>
-      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 16, marginBottom: 16 }}>
-        <input
-          type="text"
-          placeholder="Search by item, batch, or status..."
-          value={search}
-          onChange={e => {
-            setSearch(e.target.value);
-            setPage(1);
-          }}
-          style={{ padding: 8, borderRadius: 4, border: '1px solid #ccc', minWidth: 220 }}
-        />
-        <select value={filterStatus} onChange={e => { setFilterStatus(e.target.value); setPage(1); }} style={{ padding: 8, borderRadius: 4, border: '1px solid #ccc' }}>
-          <option value="">All Statuses</option>
-          {allStatuses.map(status => <option key={status} value={status}>{status}</option>)}
-        </select>
-        <button className="btn btn-primary" onClick={() => exportBatchToCSV(paginatedBatches)} style={{ marginLeft: 'auto' }}>Export CSV</button>
-        <label style={{ marginLeft: 16, fontWeight: 500 }}>
-          Show
-          <select value={batchesPerPage} onChange={e => { setBatchesPerPage(Number(e.target.value)); setPage(1); }} style={{ margin: '0 8px', padding: 4, borderRadius: 4 }}>
-            <option value={5}>5</option>
-            <option value={10}>10</option>
-            <option value={20}>20</option>
+    <section style={{ margin: 24 }}>
+      <div className="section-header">
+        <div>
+          <h2 style={{ marginBottom: 8 }}>My Requisitions</h2>
+          <p className="section-subtitle">Track your submitted batches, approval progress, and pickup codes.</p>
+        </div>
+        <button
+          className="btn btn-secondary"
+          onClick={() => exportBatchToCsv(visibleBatches.flat(), inventoryMap)}
+          disabled={!visibleBatches.length}
+        >
+          Export Visible Results
+        </button>
+      </div>
+
+      <div className="toolbar-row toolbar-row--spaced">
+        <label className="toolbar-field">
+          <span>Search</span>
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(event) => {
+              setSearchQuery(event.target.value);
+              setPage(1);
+            }}
+            placeholder="Search batch, item, status, or code"
+            aria-label="Search my requisitions"
+            style={{ minWidth: 260 }}
+          />
+        </label>
+
+        <label className="toolbar-field">
+          <span>Status</span>
+          <select
+            value={statusFilter}
+            onChange={(event) => {
+              setStatusFilter(event.target.value);
+              setPage(1);
+            }}
+            aria-label="Filter requisitions by status"
+            style={{ padding: 8, borderRadius: 4, border: "1px solid #ccc", minWidth: 180 }}
+          >
+            <option value="">All statuses</option>
+            {statusOptions.map((status) => (
+              <option key={status} value={status}>
+                {status}
+              </option>
+            ))}
           </select>
-          per page
+        </label>
+
+        <label className="toolbar-field">
+          <span>Rows per page</span>
+          <select
+            value={pageSize}
+            onChange={(event) => {
+              setPageSize(Number(event.target.value));
+              setPage(1);
+            }}
+            aria-label="Rows per page"
+            style={{ padding: 8, borderRadius: 4, border: "1px solid #ccc", minWidth: 120 }}
+          >
+            {PAGE_SIZES.map((size) => (
+              <option key={size} value={size}>
+                {size}
+              </option>
+            ))}
+          </select>
         </label>
       </div>
-      <div style={{ marginBottom: 8, fontSize: 14, color: '#555' }}>
-        Showing {batchList.length === 0 ? 0 : startIdx}-{endIdx} of {batchList.length} batches
+
+      <div className="summary-text">
+        Showing {rangeStart}-{rangeEnd} of {batchList.length} batches
       </div>
-      {batchList.length === 0 ? <div>No requisitions found.</div> : (
-        paginatedBatches.map(batch => (
-          <div key={batch[0].batch_id} style={{ border: '1px solid #e1e8ed', borderRadius: 8, marginBottom: 24, padding: 0, background: '#fafbfc', overflow: 'hidden' }}>
-            <div style={{
-              position: 'sticky',
-              top: 0,
-              background: '#e3eafc',
-              zIndex: 2,
-              padding: 16,
-              marginBottom: 8,
-              fontWeight: 600,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 16,
-              borderBottom: '1px solid #b6c6e3',
-            }}>
-              Batch ID: {batch[0].batch_id} | Department: {getDeptName(batch[0].department_id)} | IT Item: {batch[0].is_it_item ? 'Yes' : 'No'}
-              <span style={{ color: '#666', fontWeight: 400, fontSize: 13, marginLeft: 16 }}>
-                Submitted: {new Date(batch.reduce((min, r) => r.created_at < min ? r.created_at : min, batch[0].created_at)).toLocaleString()}
-              </span>
-              <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6, color: getBatchStatus(batch).color, fontWeight: 700 }}>
-                <span style={{ fontSize: 20 }}>{getBatchStatus(batch).icon}</span>
-                {getBatchStatus(batch).label}
-              </span>
-            </div>
-            <table style={{ width: '100%', marginBottom: 12 }}>
-              <thead>
-                <tr>
-                  <th style={{ cursor: 'pointer' }} onClick={() => { setSortKey('item_id'); setSortAsc(sortKey === 'item_id' ? !sortAsc : true); }}>Item</th>
-                  <th style={{ cursor: 'pointer' }} onClick={() => { setSortKey('category'); setSortAsc(sortKey === 'category' ? !sortAsc : true); }}>Category</th>
-                  <th style={{ cursor: 'pointer' }} onClick={() => { setSortKey('type'); setSortAsc(sortKey === 'type' ? !sortAsc : true); }}>Type</th>
-                  <th style={{ cursor: 'pointer' }} onClick={() => { setSortKey('quantity'); setSortAsc(sortKey === 'quantity' ? !sortAsc : true); }}>Quantity</th>
-                  <th style={{ cursor: 'pointer' }} onClick={() => { setSortKey('status'); setSortAsc(sortKey === 'status' ? !sortAsc : true); }}>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {batch.map((req, idx) => {
-                  const details = getItemDetails(req.item_id);
-                  return (
-                    <tr key={req.id} style={{ background: idx % 2 === 0 ? '#f4f6fa' : '#fff' }}>
-                      <td>{details.name}</td>
-                      <td>{details.category}</td>
-                      <td>{details.type}</td>
-                      <td>{req.quantity}</td>
-                      <td title={`Status: ${req.status}`}>{req.status}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-            <button className="btn btn-secondary" onClick={() => exportBatchToCSV(batch)}>Export CSV</button>
-          </div>
-        ))
-      )}
-      {totalPages > 1 && (
-        <div style={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          justifyContent: 'center',
-          alignItems: 'center',
-          gap: 8,
-          marginTop: 24,
-          padding: 8,
-          background: '#f5f7fa',
-          borderRadius: 8,
-          boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
-        }}>
-          <button
-            className="btn btn-secondary"
-            onClick={() => setPage(1)}
-            disabled={page === 1}
-            style={{ fontWeight: page === 1 ? 700 : 400 }}
-            title="First page"
-          >⏮</button>
-          <button
-            className="btn btn-secondary"
-            onClick={() => setPage(p => Math.max(1, p - 1))}
-            disabled={page === 1}
-            style={{ fontWeight: page === 1 ? 700 : 400 }}
-            title="Previous page"
-          >‹</button>
-          <span style={{ alignSelf: 'center', fontWeight: 500 }}>
-            Page
-            <select
-              value={page}
-              onChange={e => setPage(Number(e.target.value))}
-              style={{ margin: '0 6px', padding: 4, borderRadius: 4 }}
+
+      {!batchList.length ? (
+        <div>No requisitions matched your current filters.</div>
+      ) : (
+        visibleBatches.map((batch) => {
+          const batchStatus = getBatchStatusMeta(batch);
+          const oldestCreatedAt = getOldestCreatedAt(batch);
+          const departmentName = departmentMap.get(String(batch[0].department_id)) || batch[0].department_id || "Unassigned";
+          const sortedBatch = sortBatchItems(batch, inventoryMap, itemSort);
+
+          return (
+            <article
+              key={batch[0].batch_id}
+              className="batch-card"
             >
-              {Array.from({ length: totalPages }, (_, i) => (
-                <option key={i + 1} value={i + 1}>{i + 1}</option>
-              ))}
-            </select>
-            of {totalPages}
+              <div className="batch-card__header">
+                <strong>Batch ID: {batch[0].batch_id}</strong>
+                <span>Department: {departmentName}</span>
+                <span>Unique Code: {batch[0].unique_code || "Not assigned"}</span>
+                <span>Submitted: {oldestCreatedAt ? new Date(oldestCreatedAt).toLocaleString() : "Unknown"}</span>
+                <span className="batch-card__status" style={{ color: batchStatus.color }}>
+                  {batchStatus.icon} {batchStatus.label}
+                </span>
+              </div>
+
+              <table className="table-compact">
+                <thead>
+                  <tr>
+                    <th onClick={() => handleSortChange("item")}>
+                      Item
+                    </th>
+                    <th onClick={() => handleSortChange("category")}>
+                      Category
+                    </th>
+                    <th onClick={() => handleSortChange("type")}>
+                      Type
+                    </th>
+                    <th onClick={() => handleSortChange("quantity")}>
+                      Quantity
+                    </th>
+                    <th onClick={() => handleSortChange("status")}>
+                      Status
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sortedBatch.map((requisition, index) => {
+                    const item = inventoryMap.get(String(requisition.item_id));
+
+                    return (
+                      <tr key={requisition.id} className={index % 2 === 0 ? "row-alt" : ""}>
+                        <td>{item?.name || requisition.item_id}</td>
+                        <td>{item?.category || "-"}</td>
+                        <td>{item?.type || "-"}</td>
+                        <td>{requisition.quantity}</td>
+                        <td>{requisition.status}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+
+              <div className="batch-card__footer">
+                <button className="btn btn-secondary" onClick={() => exportBatchToCsv(batch, inventoryMap)}>
+                  Export This Batch
+                </button>
+              </div>
+            </article>
+          );
+        })
+      )}
+
+      {totalPages > 1 && (
+        <div className="toolbar-row" style={{ justifyContent: "center", marginTop: 24 }}>
+          <button className="btn btn-secondary" onClick={() => setPage(1)} disabled={currentPage === 1}>
+            First
+          </button>
+          <button
+            className="btn btn-secondary"
+            onClick={() => setPage((current) => Math.max(1, current - 1))}
+            disabled={currentPage === 1}
+          >
+            Previous
+          </button>
+          <span>
+            Page {currentPage} of {totalPages}
           </span>
           <button
             className="btn btn-secondary"
-            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-            disabled={page === totalPages}
-            style={{ fontWeight: page === totalPages ? 700 : 400 }}
-            title="Next page"
-          >›</button>
-          <button
-            className="btn btn-secondary"
-            onClick={() => setPage(totalPages)}
-            disabled={page === totalPages}
-            style={{ fontWeight: page === totalPages ? 700 : 400 }}
-            title="Last page"
-          >⏭</button>
+            onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+            disabled={currentPage === totalPages}
+          >
+            Next
+          </button>
+          <button className="btn btn-secondary" onClick={() => setPage(totalPages)} disabled={currentPage === totalPages}>
+            Last
+          </button>
         </div>
       )}
-    </div>
+    </section>
   );
 };
 
 MyRequisitions.propTypes = {
-  inventory: PropTypes.array.isRequired,
+  inventory: PropTypes.array.isRequired
 };
 
-export default MyRequisitions; 
+export default MyRequisitions;

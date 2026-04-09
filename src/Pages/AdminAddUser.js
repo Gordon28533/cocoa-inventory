@@ -1,333 +1,383 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import AuditLogViewer from "../Component/AuditLogViewer.jsx";
 import DepartmentManager from "../Component/DepartmentManager.jsx";
+import ModalCard from "../Component/ui/ModalCard.jsx";
+import StateNotice from "../Component/ui/StateNotice.jsx";
+import { useAuth } from "../Context/AuthContext.js";
+import { useDepartments } from "../Context/DepartmentsContext.js";
+import { api } from "../utils/api.js";
+
+const ROLE_OPTIONS = [
+  { value: "admin", label: "Admin" },
+  { value: "user", label: "Normal Staff" },
+  { value: "stores", label: "Stores Staff" },
+  { value: "account", label: "Branch Account" },
+  { value: "hod", label: "Head of Department (HOD)" },
+  { value: "deputy_hod", label: "Deputy HOD" },
+  { value: "account_manager", label: "Account Manager" },
+  { value: "it_manager", label: "IT Manager" }
+];
+
+const EMPTY_EDIT_FORM = {
+  staffName: "",
+  staffId: "",
+  role: "user",
+  departmentId: "",
+  password: ""
+};
+
+const getMessageTone = (message) => {
+  const normalized = String(message || "").toLowerCase();
+
+  if (!normalized) {
+    return "neutral";
+  }
+
+  if (normalized.includes("success")) {
+    return "success";
+  }
+
+  return "error";
+};
 
 const AdminAddUser = () => {
+  const navigate = useNavigate();
+  const { role: userRole, user: adminName } = useAuth();
+  const { departments } = useDepartments();
+
   const [staffName, setStaffName] = useState("");
   const [staffId, setStaffId] = useState("");
   const [role, setRole] = useState("user");
+  const [departmentId, setDepartmentId] = useState("");
+  const [password, setPassword] = useState("");
+
   const [message, setMessage] = useState("");
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [editUser, setEditUser] = useState(null);
-  const [editStaffName, setEditStaffName] = useState("");
-  const [editStaffId, setEditStaffId] = useState("");
-  const [editRole, setEditRole] = useState("user");
+
   const [passwordPrompt, setPasswordPrompt] = useState(true);
   const [passwordInput, setPasswordInput] = useState("");
   const [passwordError, setPasswordError] = useState("");
+
+  const [editUser, setEditUser] = useState(null);
+  const [editForm, setEditForm] = useState(EMPTY_EDIT_FORM);
+
   const [showAudit, setShowAudit] = useState(false);
   const [showDepartments, setShowDepartments] = useState(false);
-  const apiUrl = process.env.REACT_APP_API_URL || "http://localhost:5000";
-  const [editPassword, setEditPassword] = useState("");
-  const [password, setPassword] = useState("");
+
   const [changePwOld, setChangePwOld] = useState("");
   const [changePwNew, setChangePwNew] = useState("");
   const [changePwConfirm, setChangePwConfirm] = useState("");
   const [changePwMsg, setChangePwMsg] = useState("");
   const [changePwLoading, setChangePwLoading] = useState(false);
-  const [departments, setDepartments] = useState([]);
-  const [departmentId, setDepartmentId] = useState("");
-  const [editDepartmentId, setEditDepartmentId] = useState("");
 
-  const userRole = localStorage.getItem("role");
-  const adminName = localStorage.getItem("user");
+  const messageTone = useMemo(() => getMessageTone(message), [message]);
+  const changePasswordTone = useMemo(() => getMessageTone(changePwMsg), [changePwMsg]);
+
   useEffect(() => {
-    if (userRole !== "admin") {
-      window.location.href = "/dashboard";
+    if (userRole && userRole !== "admin") {
+      navigate("/dashboard", { replace: true });
     }
-  }, [userRole]);
+  }, [navigate, userRole]);
 
   useEffect(() => {
-    if (!passwordPrompt) fetchUsers();
+    if (!passwordPrompt) {
+      fetchUsers();
+    }
   }, [passwordPrompt]);
-
-  // Fetch departments on mount
-  useEffect(() => {
-    const fetchDepartments = async () => {
-      const token = localStorage.getItem("token");
-      try {
-        const res = await fetch(`${apiUrl}/departments`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        if (res.ok) {
-          setDepartments(await res.json());
-        } else {
-          setMessage("Failed to fetch departments.");
-          if (res.status === 401) {
-            localStorage.removeItem("token");
-            localStorage.removeItem("role");
-            localStorage.removeItem("user");
-            setTimeout(() => { window.location.href = "/login"; }, 2000);
-          }
-        }
-      } catch (err) {
-        setMessage("Failed to fetch departments.");
-        console.error("Fetch departments exception:", err);
-      }
-    };
-    fetchDepartments();
-  }, [apiUrl]);
 
   const fetchUsers = async () => {
     setLoading(true);
-    const token = localStorage.getItem("token");
-    console.log("Fetching users with token:", token);
+
     try {
-      const response = await fetch(`${apiUrl}/users`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      console.log("Response status:", response.status);
-      const data = await response.json();
-      if (response.ok) {
-        setUsers(data);
-      } else {
-        setMessage(data.error || "Failed to fetch users.");
-        console.log("Fetch users error:", data.error);
-        if (response.status === 401) {
-          localStorage.removeItem("token");
-          localStorage.removeItem("role");
-          localStorage.removeItem("user");
-          setTimeout(() => { window.location.href = "/login"; }, 2000);
-        }
-      }
-    } catch (err) {
-      setMessage("Failed to fetch users.");
-      console.error("Fetch users exception:", err);
+      const data = await api.getUsers();
+      setUsers(Array.isArray(data) ? data : []);
+    } catch (error) {
+      setMessage(error.message || "Failed to fetch users.");
+      console.error("Fetch users exception:", error);
     } finally {
       setLoading(false);
     }
   };
 
-  const handlePasswordSubmit = async (e) => {
-    e.preventDefault();
-    setPasswordError("");
-    // Verify password with backend
-    try {
-      const response = await fetch(`${apiUrl}/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ staffName: adminName, password: passwordInput })
-      });
-      const data = await response.json();
-      if (response.ok && data.success) {
-        setPasswordPrompt(false);
-        setPasswordInput("");
-      } else {
-        setPasswordError("Incorrect password. Please try again.");
-      }
-    } catch (err) {
-      setPasswordError("Network error. Please try again.");
-    }
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setMessage("");
-    const token = localStorage.getItem("token");
-    const response = await fetch(`${apiUrl}/users`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`
-      },
-      body: JSON.stringify({ staffName, staffId, role, password, department_id: departmentId }),
-    });
-    const data = await response.json();
-    if (response.ok && data.success) {
-      setMessage("User added successfully!");
-      setStaffName("");
-      setStaffId("");
-      setPassword("");
-      setDepartmentId("");
-      fetchUsers();
-    } else {
-      setMessage(data.error || "Failed to add user.");
-      if (response.status === 401) {
-        localStorage.removeItem("token");
-        localStorage.removeItem("role");
-        localStorage.removeItem("user");
-        setTimeout(() => { window.location.href = "/login"; }, 2000);
-      }
-    }
-  };
-
-  const handleDelete = async (userId) => {
-    if (!window.confirm("Are you sure you want to delete this user?")) return;
-    const token = localStorage.getItem("token");
-    try {
-      const response = await fetch(`${apiUrl}/users/${userId}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const data = await response.json();
-      if (response.ok && data.success) {
-        setMessage("User deleted successfully!");
-        fetchUsers();
-      } else {
-        setMessage(data.error || "Failed to delete user.");
-        if (response.status === 401) {
-          localStorage.removeItem("token");
-          localStorage.removeItem("role");
-          localStorage.removeItem("user");
-          setTimeout(() => { window.location.href = "/login"; }, 2000);
-        }
-      }
-    } catch (err) {
-      setMessage("Failed to delete user.");
-    }
-  };
-
-  const openEditModal = (user) => {
-    setEditUser(user);
-    setEditStaffName(user.staffName);
-    setEditStaffId(user.staffId);
-    setEditRole(user.role);
-    setEditPassword(""); // Reset password field on open
-    setEditDepartmentId(user.department_id || "");
-    setMessage(""); // Clear message on open
+  const resetCreateForm = () => {
+    setStaffName("");
+    setStaffId("");
+    setRole("user");
+    setDepartmentId("");
+    setPassword("");
   };
 
   const closeEditModal = () => {
     setEditUser(null);
-    setEditStaffName("");
-    setEditStaffId("");
-    setEditRole("user");
-    setEditPassword(""); // Reset password field on close
-    setMessage(""); // Clear message on close
+    setEditForm(EMPTY_EDIT_FORM);
+    setMessage("");
   };
 
-  const handleEditSubmit = async (e) => {
-    e.preventDefault();
-    setMessage("");
-    const token = localStorage.getItem("token");
-    const body = { staffName: editStaffName, staffId: editStaffId, role: editRole, department_id: editDepartmentId };
-    if (editPassword) body.password = editPassword;
-    const response = await fetch(`${apiUrl}/users/${editUser.id}`, {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`
-      },
-      body: JSON.stringify(body),
+  const openEditModal = (user) => {
+    setEditUser(user);
+    setEditForm({
+      staffName: user.staffName || "",
+      staffId: user.staffId || "",
+      role: user.role || "user",
+      departmentId: user.department_id || "",
+      password: ""
     });
-    const data = await response.json();
-    if (response.ok && data.success) {
-      setMessage("User updated successfully!");
-      closeEditModal();
-      fetchUsers();
-    } else {
-      setMessage(data.error || "Failed to update user.");
-      if (response.status === 401) {
-        localStorage.removeItem("token");
-        localStorage.removeItem("role");
-        localStorage.removeItem("user");
-        setTimeout(() => { window.location.href = "/login"; }, 2000);
+    setMessage("");
+  };
+
+  const handlePasswordSubmit = async (event) => {
+    event.preventDefault();
+    setPasswordError("");
+
+    try {
+      const data = await api.login({ staffName: adminName, password: passwordInput });
+
+      if (data.success) {
+        setPasswordPrompt(false);
+        setPasswordInput("");
       }
+    } catch (error) {
+      setPasswordError(error.message || "Network error. Please try again.");
+    }
+  };
+
+  const handleCreateUser = async (event) => {
+    event.preventDefault();
+    setMessage("");
+
+    try {
+      const data = await api.createUser({
+        staffName,
+        staffId,
+        role,
+        password,
+        department_id: departmentId
+      });
+
+      if (data.success) {
+        setMessage("User added successfully!");
+        resetCreateForm();
+        await fetchUsers();
+      }
+    } catch (error) {
+      setMessage(error.message || "Failed to add user.");
+    }
+  };
+
+  const handleDeleteUser = async (userId) => {
+    if (!window.confirm("Are you sure you want to delete this user?")) {
+      return;
+    }
+
+    try {
+      const data = await api.deleteUser(userId);
+
+      if (data.success) {
+        setMessage("User deleted successfully!");
+        await fetchUsers();
+      }
+    } catch (error) {
+      setMessage(error.message || "Failed to delete user.");
+    }
+  };
+
+  const handleDeactivateUser = async (userId) => {
+    if (!window.confirm("Are you sure you want to deactivate this user?")) {
+      return;
+    }
+
+    try {
+      const data = await api.deactivateUser(userId);
+
+      if (data.success) {
+        setMessage("User deactivated successfully!");
+        await fetchUsers();
+      }
+    } catch (error) {
+      setMessage(error.message || "Failed to deactivate user.");
+    }
+  };
+
+  const handleEditSubmit = async (event) => {
+    event.preventDefault();
+    setMessage("");
+
+    const requestBody = {
+      staffName: editForm.staffName,
+      staffId: editForm.staffId,
+      role: editForm.role,
+      department_id: editForm.departmentId
+    };
+
+    if (editForm.password) {
+      requestBody.password = editForm.password;
+    }
+
+    try {
+      const data = await api.updateUser(editUser.id, requestBody);
+
+      if (data.success) {
+        setMessage("User updated successfully!");
+        closeEditModal();
+        await fetchUsers();
+      }
+    } catch (error) {
+      setMessage(error.message || "Failed to update user.");
+    }
+  };
+
+  const handleChangePassword = async (event) => {
+    event.preventDefault();
+    setChangePwMsg("");
+
+    if (!changePwOld || !changePwNew || !changePwConfirm) {
+      setChangePwMsg("All fields are required.");
+      return;
+    }
+
+    if (changePwNew !== changePwConfirm) {
+      setChangePwMsg("New passwords do not match.");
+      return;
+    }
+
+    setChangePwLoading(true);
+
+    try {
+      const data = await api.changePassword({ oldPassword: changePwOld, newPassword: changePwNew });
+
+      if (data.success) {
+        setChangePwMsg("Password changed successfully!");
+        setChangePwOld("");
+        setChangePwNew("");
+        setChangePwConfirm("");
+      }
+    } catch (error) {
+      setChangePwMsg(error.message || "Network error. Please try again.");
+    } finally {
+      setChangePwLoading(false);
     }
   };
 
   if (passwordPrompt) {
     return (
-      <div style={{ maxWidth: 400, margin: "80px auto", padding: 32, background: "#fff", borderRadius: 12, boxShadow: "0 2px 16px rgba(0,0,0,0.08)" }}>
-        <h2>Admin Password Required</h2>
-        <form onSubmit={handlePasswordSubmit}>
-          <input
-            type="password"
-            placeholder="Enter your admin password"
-            value={passwordInput}
-            onChange={e => setPasswordInput(e.target.value)}
-            required
-            style={{ width: "100%", padding: 12, marginBottom: 16, borderRadius: 6, border: "1px solid #ccc" }}
-          />
-          {passwordError && <div style={{ color: "red", marginBottom: 12 }}>{passwordError}</div>}
-          <button type="submit" style={{ padding: "10px 24px", borderRadius: 6, background: "#1976d2", color: "#fff", border: "none", fontWeight: 600 }}>Confirm</button>
-        </form>
+      <div style={{ maxWidth: 420, margin: "80px auto" }}>
+        <div className="form-container">
+          <h2 style={{ marginBottom: 16 }}>Admin Password Required</h2>
+          <form onSubmit={handlePasswordSubmit}>
+            <input
+              type="password"
+              placeholder="Enter your admin password"
+              value={passwordInput}
+              onChange={(event) => setPasswordInput(event.target.value)}
+              required
+              style={{ width: "100%", padding: 12, marginBottom: 16, borderRadius: 6, border: "1px solid #ccc" }}
+            />
+            {passwordError && <StateNotice tone="error">{passwordError}</StateNotice>}
+            <button type="submit" className="btn btn-primary" style={{ marginTop: 12 }}>
+              Confirm
+            </button>
+          </form>
+        </div>
       </div>
     );
   }
 
-  const ROLES = [
-    { value: "user", label: "Normal Staff" },
-    { value: "stores", label: "Stores Staff" },
-    { value: "hod", label: "Head of Department (HOD)" },
-    { value: "deputy_hod", label: "Deputy HOD" },
-    { value: "admin", label: "Admin" },
-    { value: "it_manager", label: "IT Manager" },
-    { value: "account_manager", label: "Account Manager" }
-  ];
-
   return (
     <div className="admin-add-user">
-      <h2>User Management</h2>
-      <div style={{ background: '#e8f0fe', padding: 16, borderRadius: 8, marginBottom: 16, color: '#333', fontSize: 15 }}>
-        <b>Branch Setup Guidance:</b><br/>
-        <ul style={{ margin: '8px 0 0 18px', padding: 0 }}>
-          <li>Ensure departments exist for each branch: <b>Tema Takeover Center</b>, <b>Kumasi Takeover Center</b>, <b>Takoradi Takeover Center</b>, and <b>Head Office</b>.</li>
-          <li>For each branch, add at least one user with role <b>stores</b> and one with role <b>account</b>.</li>
-          <li>For Head Office, add users with roles <b>account_manager</b> and <b>stores</b> for final approvals and fulfillment.</li>
-        </ul>
-        <span style={{ color: '#1976d2' }}>This setup enables the multi-step branch requisition approval workflow.</span>
+      <div className="section-header">
+        <div>
+          <h2 style={{ marginBottom: 8 }}>User Management</h2>
+          <p className="section-subtitle">Create staff accounts, manage roles, and maintain approval access.</p>
+        </div>
       </div>
-      <form onSubmit={handleSubmit} style={{ marginBottom: 24 }}>
-        <input
-          type="text"
-          placeholder="Staff Name"
-          value={staffName}
-          onChange={e => setStaffName(e.target.value)}
-          required
-          style={{ marginRight: 8, marginBottom: 8 }}
-        />
-        <input
-          type="text"
-          placeholder="Staff ID"
-          value={staffId}
-          onChange={e => setStaffId(e.target.value)}
-          required
-          style={{ marginRight: 8, marginBottom: 8 }}
-        />
-        <select
-          value={role}
-          onChange={e => setRole(e.target.value)}
-          required
-          style={{ marginRight: 8, marginBottom: 8 }}
-        >
-          <option value="">Select Role</option>
-          <option value="admin">Admin</option>
-          <option value="user">User</option>
-          <option value="stores">Stores</option>
-          <option value="hod">HOD</option>
-          <option value="deputy_hod">Deputy HOD</option>
-          <option value="account_manager">Account Manager</option>
-          <option value="it_manager">IT Manager</option>
-        </select>
-        <select
-          value={departmentId}
-          onChange={e => setDepartmentId(e.target.value)}
-          required
-          style={{ marginRight: 8, marginBottom: 8 }}
-        >
-          <option value="">Select Department</option>
-          {departments.map(dept => (
-            <option key={dept.id} value={dept.id}>{dept.name}</option>
-          ))}
-        </select>
-        <input
-          type="password"
-          placeholder="Password (leave blank for default)"
-          value={password}
-          onChange={e => setPassword(e.target.value)}
-          style={{ marginRight: 8, marginBottom: 8 }}
-          autoComplete="new-password"
-        />
-        <button type="submit" style={{ padding: '8px 20px', borderRadius: 6, background: '#1976d2', color: '#fff', border: 'none', fontWeight: 600 }}>Add User</button>
-      </form>
-      {message && !editUser && <p>{message}</p>}
-      <h3>All Users</h3>
+
+      <StateNotice>
+        <strong>Branch Setup Guidance:</strong>
+        <ul style={{ margin: "8px 0 0 18px", padding: 0 }}>
+          <li>Ensure departments exist for each branch: Tema Takeover Center, Kumasi Takeover Center, Takoradi Takeover Center, and Head Office.</li>
+          <li>For each branch, add at least one user with role `stores` and one with role `account`.</li>
+          <li>For Head Office, add users with roles `account_manager` and `stores` for final approvals and fulfillment.</li>
+        </ul>
+        <div style={{ marginTop: 8, color: "#1976d2" }}>
+          This setup enables the multi-step branch requisition approval workflow.
+        </div>
+      </StateNotice>
+
+      <div className="form-container" style={{ marginTop: 24 }}>
+        <h3>Add User</h3>
+        <form onSubmit={handleCreateUser} className="toolbar-row">
+          <input
+            id="staffName"
+            name="staffName"
+            type="text"
+            placeholder="Staff Name"
+            value={staffName}
+            onChange={(event) => setStaffName(event.target.value)}
+            required
+            autoComplete="name"
+          />
+          <input
+            id="staffId"
+            name="staffId"
+            type="text"
+            placeholder="Staff ID"
+            value={staffId}
+            onChange={(event) => setStaffId(event.target.value)}
+            required
+            autoComplete="off"
+          />
+          <select id="role" name="role" value={role} onChange={(event) => setRole(event.target.value)} required>
+            {ROLE_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+          <select
+            id="departmentId"
+            name="departmentId"
+            value={departmentId}
+            onChange={(event) => setDepartmentId(event.target.value)}
+            required
+          >
+            <option value="">Select Department</option>
+            {departments.map((department) => (
+              <option key={department.id} value={department.id}>
+                {department.name}
+              </option>
+            ))}
+          </select>
+          <input
+            id="password"
+            name="password"
+            type="password"
+            placeholder="Password (leave blank for default)"
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+            autoComplete="new-password"
+          />
+          <button type="submit" className="btn btn-primary">
+            Add User
+          </button>
+        </form>
+      </div>
+
+      {message && !editUser && (
+        <div style={{ marginBottom: 24 }}>
+          <StateNotice tone={messageTone}>{message}</StateNotice>
+        </div>
+      )}
+
+      <div className="section-header" style={{ marginBottom: 16 }}>
+        <h3 style={{ margin: 0 }}>All Users</h3>
+      </div>
+
       {loading ? (
-        <p>Loading users...</p>
+        <StateNotice>Loading users...</StateNotice>
       ) : users.length === 0 ? (
-        <p>No users found.</p>
+        <StateNotice>No users found.</StateNotice>
       ) : (
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>
@@ -335,6 +385,7 @@ const AdminAddUser = () => {
               <th>Name</th>
               <th>Staff ID</th>
               <th>Role</th>
+              <th>Status</th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -345,167 +396,171 @@ const AdminAddUser = () => {
                 <td>{user.staffId}</td>
                 <td>{user.role}</td>
                 <td>
-                  <button style={{ marginRight: 8 }} onClick={() => openEditModal(user)}>Edit</button>
-                  <button onClick={() => handleDelete(user.id)}>Delete</button>
+                  <StateNotice tone={user.isActive ? "success" : "error"}>
+                    {user.isActive ? "Active" : "Inactive"}
+                  </StateNotice>
+                </td>
+                <td>
+                  <div className="dashboard-actions">
+                    <button className="btn btn-secondary" onClick={() => openEditModal(user)}>
+                      Edit
+                    </button>
+                    {user.isActive ? (
+                      <button className="btn btn-secondary" onClick={() => handleDeactivateUser(user.id)}>
+                        Deactivate
+                      </button>
+                    ) : (
+                      <span style={{ color: "#6c757d" }}>Deactivated</span>
+                    )}
+                    <button className="btn btn-danger" onClick={() => handleDeleteUser(user.id)}>
+                      Delete
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
       )}
+
       {editUser && (
-        <div style={{
-          position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh',
-          background: 'rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
-        }}>
-          <div style={{ background: '#fff', padding: 32, borderRadius: 8, minWidth: 320, boxShadow: '0 2px 16px rgba(0,0,0,0.2)' }}>
-            <h3>Edit User</h3>
-            <form onSubmit={handleEditSubmit}>
-              <label htmlFor="editStaffName">Staff Name</label>
-              <input
-                id="editStaffName"
-                name="editStaffName"
-                type="text"
-                placeholder="Staff Name"
-                value={editStaffName}
-                onChange={e => setEditStaffName(e.target.value)}
-                required
-                style={{ display: 'block', marginBottom: 12, width: '100%' }}
-              />
-              <label htmlFor="editStaffId">Staff ID</label>
-              <input
-                id="editStaffId"
-                name="editStaffId"
-                type="text"
-                placeholder="Staff ID"
-                value={editStaffId}
-                onChange={e => setEditStaffId(e.target.value)}
-                required
-                style={{ display: 'block', marginBottom: 12, width: '100%' }}
-              />
-              <label htmlFor="editRole">Role</label>
-              <select 
-                id="editRole"
-                name="editRole"
-                value={editRole} 
-                onChange={e => setEditRole(e.target.value)}
-                style={{ display: 'block', marginBottom: 12, width: '100%', minHeight: 40, zIndex: 10, position: 'relative' }}
-              >
-                {ROLES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
-              </select>
-              <label htmlFor="editDepartmentId">Department</label>
-              <select
-                id="editDepartmentId"
-                name="editDepartmentId"
-                value={editDepartmentId}
-                onChange={e => setEditDepartmentId(e.target.value)}
-                style={{ minHeight: 40, zIndex: 10, position: 'relative', marginBottom: 12, width: '100%' }}
-                required
-              >
-                <option value="">Select Department</option>
-                {departments.map(dept => (
-                  <option key={dept.id} value={dept.id}>{dept.name}</option>
-                ))}
-              </select>
-              <label htmlFor="editPassword">Set new password (optional)</label>
-              <input
-                id="editPassword"
-                name="editPassword"
-                type="password"
-                placeholder="Set new password (optional)"
-                value={editPassword}
-                onChange={e => setEditPassword(e.target.value)}
-                style={{ display: 'block', marginBottom: 12, width: '100%' }}
-              />
-              {message && editUser && <div style={{ color: 'red', marginBottom: 12 }}>{message}</div>}
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-                <button type="button" onClick={closeEditModal} style={{ background: '#eee' }}>Cancel</button>
-                <button type="submit">Save</button>
-              </div>
-            </form>
-          </div>
-        </div>
+        <ModalCard title="Edit User">
+          <form onSubmit={handleEditSubmit}>
+            <label htmlFor="editStaffName">Staff Name</label>
+            <input
+              id="editStaffName"
+              name="editStaffName"
+              type="text"
+              value={editForm.staffName}
+              onChange={(event) => setEditForm((current) => ({ ...current, staffName: event.target.value }))}
+              required
+              style={{ display: "block", marginBottom: 12, width: "100%" }}
+            />
+
+            <label htmlFor="editStaffId">Staff ID</label>
+            <input
+              id="editStaffId"
+              name="editStaffId"
+              type="text"
+              value={editForm.staffId}
+              onChange={(event) => setEditForm((current) => ({ ...current, staffId: event.target.value }))}
+              required
+              style={{ display: "block", marginBottom: 12, width: "100%" }}
+            />
+
+            <label htmlFor="editRole">Role</label>
+            <select
+              id="editRole"
+              name="editRole"
+              value={editForm.role}
+              onChange={(event) => setEditForm((current) => ({ ...current, role: event.target.value }))}
+              style={{ display: "block", marginBottom: 12, width: "100%", minHeight: 40 }}
+            >
+              {ROLE_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+
+            <label htmlFor="editDepartmentId">Department</label>
+            <select
+              id="editDepartmentId"
+              name="editDepartmentId"
+              value={editForm.departmentId}
+              onChange={(event) => setEditForm((current) => ({ ...current, departmentId: event.target.value }))}
+              style={{ display: "block", marginBottom: 12, width: "100%", minHeight: 40 }}
+              required
+            >
+              <option value="">Select Department</option>
+              {departments.map((department) => (
+                <option key={department.id} value={department.id}>
+                  {department.name}
+                </option>
+              ))}
+            </select>
+
+            <label htmlFor="editPassword">Set new password (optional)</label>
+            <input
+              id="editPassword"
+              name="editPassword"
+              type="password"
+              placeholder="Set new password (optional)"
+              value={editForm.password}
+              onChange={(event) => setEditForm((current) => ({ ...current, password: event.target.value }))}
+              style={{ display: "block", marginBottom: 12, width: "100%" }}
+            />
+
+            {message && <StateNotice tone="error">{message}</StateNotice>}
+
+            <div className="dashboard-actions" style={{ justifyContent: "flex-end", marginTop: 16 }}>
+              <button type="button" onClick={closeEditModal} className="btn btn-secondary">
+                Cancel
+              </button>
+              <button type="submit" className="btn btn-primary">
+                Save
+              </button>
+            </div>
+          </form>
+        </ModalCard>
       )}
-      <div style={{ marginTop: 40 }}>
-        <button onClick={() => setShowAudit(!showAudit)} style={{ marginRight: 16, padding: '10px 20px', borderRadius: 6, background: '#28a745', color: '#fff', border: 'none', fontWeight: 600 }}>📝 Audit Logs</button>
-        <button onClick={() => setShowDepartments(!showDepartments)} style={{ padding: '10px 20px', borderRadius: 6, background: '#ffc107', color: '#333', border: 'none', fontWeight: 600 }}>🏢 Department Management</button>
+
+      <div className="dashboard-actions" style={{ marginTop: 40 }}>
+        <button onClick={() => setShowAudit((current) => !current)} className="btn btn-success">
+          Audit Logs
+        </button>
+        <button onClick={() => setShowDepartments((current) => !current)} className="btn btn-secondary">
+          Department Management
+        </button>
       </div>
+
       {showAudit && (
-        <div style={{ margin: '32px 0' }}>
+        <div style={{ margin: "32px 0" }}>
           <AuditLogViewer />
         </div>
       )}
+
       {showDepartments && (
-        <div style={{ margin: '32px 0' }}>
+        <div style={{ margin: "32px 0" }}>
           <DepartmentManager />
         </div>
       )}
-      {/* Change My Password Section */}
-      <div style={{ marginTop: 48, maxWidth: 400, background: '#f9f9f9', padding: 24, borderRadius: 10, boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
-        <h3 style={{ marginBottom: 16 }}>Change My Password</h3>
-        <form onSubmit={async (e) => {
-          e.preventDefault();
-          setChangePwMsg("");
-          if (!changePwOld || !changePwNew || !changePwConfirm) {
-            setChangePwMsg("All fields are required.");
-            return;
-          }
-          if (changePwNew !== changePwConfirm) {
-            setChangePwMsg("New passwords do not match.");
-            return;
-          }
-          setChangePwLoading(true);
-          try {
-            const token = localStorage.getItem("token");
-            const res = await fetch(`${apiUrl}/change-password`, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${token}`
-              },
-              body: JSON.stringify({ oldPassword: changePwOld, newPassword: changePwNew })
-            });
-            const data = await res.json();
-            if (res.ok && data.success) {
-              setChangePwMsg("Password changed successfully!");
-              setChangePwOld(""); setChangePwNew(""); setChangePwConfirm("");
-            } else {
-              setChangePwMsg(data.error || data.message || "Failed to change password.");
-            }
-          } catch (err) {
-            setChangePwMsg("Network error. Please try again.");
-          } finally {
-            setChangePwLoading(false);
-          }
-        }}>
+
+      <div className="form-container" style={{ marginTop: 48, maxWidth: 440 }}>
+        <h3>Change My Password</h3>
+        <form onSubmit={handleChangePassword}>
           <input
             type="password"
             placeholder="Current password"
             value={changePwOld}
-            onChange={e => setChangePwOld(e.target.value)}
-            style={{ display: 'block', marginBottom: 10, width: '100%' }}
+            onChange={(event) => setChangePwOld(event.target.value)}
+            style={{ display: "block", marginBottom: 10, width: "100%" }}
             required
           />
           <input
             type="password"
             placeholder="New password"
             value={changePwNew}
-            onChange={e => setChangePwNew(e.target.value)}
-            style={{ display: 'block', marginBottom: 10, width: '100%' }}
+            onChange={(event) => setChangePwNew(event.target.value)}
+            style={{ display: "block", marginBottom: 10, width: "100%" }}
             required
           />
           <input
             type="password"
             placeholder="Confirm new password"
             value={changePwConfirm}
-            onChange={e => setChangePwConfirm(e.target.value)}
-            style={{ display: 'block', marginBottom: 14, width: '100%' }}
+            onChange={(event) => setChangePwConfirm(event.target.value)}
+            style={{ display: "block", marginBottom: 14, width: "100%" }}
             required
           />
-          <button type="submit" disabled={changePwLoading} style={{ width: '100%', padding: 10, borderRadius: 6, background: '#1976d2', color: '#fff', border: 'none', fontWeight: 600 }}>
+          <button type="submit" disabled={changePwLoading} className="btn btn-primary" style={{ width: "100%" }}>
             {changePwLoading ? "Changing..." : "Change Password"}
           </button>
-          {changePwMsg && <div style={{ color: changePwMsg.includes('success') ? 'green' : 'red', marginTop: 10 }}>{changePwMsg}</div>}
+          {changePwMsg && (
+            <div style={{ marginTop: 10 }}>
+              <StateNotice tone={changePasswordTone}>{changePwMsg}</StateNotice>
+            </div>
+          )}
         </form>
       </div>
     </div>

@@ -1,44 +1,32 @@
 import React, { useEffect, useState } from "react";
+import { useAuth } from "../Context/AuthContext.js";
+import StateNotice from "./ui/StateNotice.jsx";
+import { api } from "../utils/api.js";
 
 const AuditLogViewer = () => {
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const token = localStorage.getItem("token");
+  const { token } = useAuth();
 
   useEffect(() => {
+    if (!token) {
+      setLogs([]);
+      setLoading(false);
+      return;
+    }
+
     fetchLogs();
-    // eslint-disable-next-line
-  }, []);
+  }, [token]);
 
   const fetchLogs = async () => {
     setLoading(true);
     setError("");
     try {
-      const res = await fetch("http://localhost:5000/audit-logs", {
-        headers: { Authorization: "Bearer " + token }
-      });
-      let data;
-      try {
-        data = await res.json();
-      } catch {
-        data = {};
-      }
-      if (res.ok) {
-        setLogs(data);
-      } else if (res.status === 401 || res.status === 403) {
-        localStorage.removeItem("token");
-        setError("Session expired or not authorized. Please log in again.");
-        setTimeout(() => {
-          window.location.href = "/login";
-        }, 2000);
-      } else if (res.status === 500) {
-        setError("Internal server error. Please check backend logs.");
-      } else {
-        setError(data.error || "Failed to fetch logs.");
-      }
+      const data = await api.getAuditLogs();
+      setLogs(Array.isArray(data) ? data : []);
     } catch (err) {
-      setError("Could not connect to server. Is the backend running?");
+      setError(err.message || "Could not connect to server. Is the backend running?");
       console.error("Fetch error:", err);
     } finally {
       setLoading(false);
@@ -48,9 +36,9 @@ const AuditLogViewer = () => {
   return (
     <div style={{ margin: 24 }}>
       <h2>Audit Logs</h2>
-      {loading && <div>Loading...</div>}
-      {error && <div style={{ color: 'red' }}>{error}</div>}
-      {!loading && !error && (
+      {loading && <StateNotice>Loading...</StateNotice>}
+      {error && <StateNotice tone="error">{error}</StateNotice>}
+      {!loading && !error && Array.isArray(logs) && logs.length > 0 && (
         <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 16 }}>
           <thead>
             <tr>
@@ -71,6 +59,9 @@ const AuditLogViewer = () => {
             ))}
           </tbody>
         </table>
+      )}
+      {!loading && !error && Array.isArray(logs) && logs.length === 0 && (
+        <StateNotice>No audit logs found.</StateNotice>
       )}
     </div>
   );

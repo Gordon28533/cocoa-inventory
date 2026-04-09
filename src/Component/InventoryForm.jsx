@@ -1,95 +1,119 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import PropTypes from "prop-types";
 import tonerStock from "../data/tonerStock";
 import stationeryStock from "../data/stationeryStock";
 import generalStock from "../data/generalStock";
+import { useAuth } from "../Context/AuthContext.js";
+import { api } from "../utils/api.js";
 
-const InventoryForm = ({ setInventory }) => {
-  const [item, setItem] = useState({
-    id: "",
-    name: "",
-    category: "",
-    type: "",
-    quantity: 0,
-  });
+const EMPTY_ITEM = {
+  id: "",
+  name: "",
+  category: "",
+  type: "",
+  quantity: 0
+};
+
+const normalizeItem = (item = {}) => ({
+  id: item.id || "",
+  name: item.name || "",
+  category: item.category || "",
+  type: item.type || "",
+  quantity: Number(item.quantity) || 0
+});
+
+const InventoryForm = ({
+  setInventory = undefined,
+  initialItem = null,
+  onSubmit = undefined,
+  onCancel = undefined,
+  isEdit = false
+}) => {
+  const { token } = useAuth();
+  const [item, setItem] = useState(() => normalizeItem(initialItem || EMPTY_ITEM));
   const [fetchedItems, setFetchedItems] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState("");
-  const token = localStorage.getItem("token");
 
   useEffect(() => {
+    setItem(normalizeItem(initialItem || EMPTY_ITEM));
+  }, [initialItem]);
+
+  useEffect(() => {
+    if (!token || isEdit) {
+      setFetchedItems([]);
+      return;
+    }
+
+    let isMounted = true;
+
     const fetchItems = async () => {
       try {
-        const response = await fetch("http://localhost:5000/items", {
-          headers: { Authorization: "Bearer " + token },
-        });
-        if (response.ok) {
-          const data = await response.json();
-          setFetchedItems(data);
-        } else {
-          setFetchedItems([]);
+        const data = await api.getItems();
+
+        if (isMounted) {
+          setFetchedItems(Array.isArray(data) ? data : []);
         }
       } catch (error) {
+        if (isMounted) {
+          setFetchedItems([]);
+        }
+
         console.error("Error fetching items:", error);
       }
     };
 
     fetchItems();
-  }, [token]);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+    return () => {
+      isMounted = false;
+    };
+  }, [isEdit, token]);
+
+  const stockOptions = useMemo(() => {
+    if (item.category === "Toner Stock") return tonerStock;
+    if (item.category === "Stationery Stock") return stationeryStock;
+    if (item.category === "General Stock") return generalStock;
+    return [];
+  }, [item.category]);
+
+  const updateItem = (field, value) => {
+    setItem((current) => ({ ...current, [field]: value }));
+  };
+
+  const resetForm = () => {
+    setItem(normalizeItem(initialItem || EMPTY_ITEM));
+    setMessage("");
+  };
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
     setIsSubmitting(true);
     setMessage("");
 
     try {
-      const response = await fetch("http://localhost:5000/items", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: "Bearer " + token,
-        },
-        body: JSON.stringify(item),
-      });
-      
-      if (response.ok) {
-        const newItem = await response.json();
-        setInventory((prev) => [...prev, newItem]);
-        setMessage("Item added successfully!");
-        setItem({ id: "", name: "", category: "", type: "", quantity: 0 });
-        
-        // Clear success message after 3 seconds
-        setTimeout(() => setMessage(""), 3000);
-      } else if (response.status === 401 || response.status === 403) {
-        setMessage("Unauthorized. Please log in again.");
+      if (onSubmit) {
+        await onSubmit(item);
       } else {
-        setMessage("Failed to add item. Please try again.");
+        const newItem = await api.createItem(item);
+        setInventory?.((previous) => [...previous, newItem]);
+        setMessage("Item added successfully!");
+        setItem(normalizeItem(EMPTY_ITEM));
+        window.setTimeout(() => setMessage(""), 3000);
       }
     } catch (error) {
-      setMessage("Network error. Please check your connection.");
+      setMessage(error.message || "Network error. Please check your connection.");
       console.error(error);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const getStockArray = () => {
-    if (item.category === "Toner Stock") return tonerStock;
-    if (item.category === "Stationery Stock") return stationeryStock;
-    if (item.category === "General Stock") return generalStock;
-    return [];
-  };
-
-  const resetForm = () => {
-    setItem({ id: "", name: "", category: "", type: "", quantity: 0 });
-    setMessage("");
-  };
-
   return (
     <div>
       {message && (
-        <div 
-          className={message.includes("successfully") ? "success" : "error"}
+        <div
+          className={message.toLowerCase().includes("success") ? "success" : "error"}
           role="alert"
           aria-live="polite"
         >
@@ -97,54 +121,57 @@ const InventoryForm = ({ setInventory }) => {
         </div>
       )}
 
-      <form onSubmit={handleSubmit} aria-label="Add inventory item form">
+      <form onSubmit={handleSubmit} aria-label={isEdit ? "Edit inventory item form" : "Add inventory item form"}>
         <div className="form-row">
           <div className="form-group">
             <label htmlFor="category">Category *</label>
             <select
               id="category"
               value={item.category}
-              onChange={(e) =>
-                setItem({ ...item, category: e.target.value, id: "", name: "" })
-              }
+              onChange={(event) => setItem((current) => ({
+                ...current,
+                category: event.target.value,
+                id: isEdit ? current.id : "",
+                name: isEdit ? current.name : ""
+              }))}
               required
-              disabled={isSubmitting}
+              disabled={isSubmitting || isEdit}
             >
               <option value="">Select Category</option>
-              <option value="Toner Stock">🖨️ Toner Stock</option>
-              <option value="Stationery Stock">📝 Stationery Stock</option>
-              <option value="General Stock">📦 General Stock</option>
+              <option value="Toner Stock">Toner Stock</option>
+              <option value="Stationery Stock">Stationery Stock</option>
+              <option value="General Stock">General Stock</option>
             </select>
           </div>
 
-          {item.category && (
-            <div className="form-group">
-              <label htmlFor="itemId">Item ID *</label>
+          <div className="form-group">
+            <label htmlFor="itemId">Item ID *</label>
+            {isEdit ? (
+              <input id="itemId" type="text" value={item.id} readOnly disabled />
+            ) : (
               <select
                 id="itemId"
                 value={item.id}
-                onChange={(e) => {
-                  const selected = getStockArray().find(
-                    (stockItem) => stockItem.id === e.target.value
-                  );
-                  setItem({
-                    ...item,
+                onChange={(event) => {
+                  const selected = stockOptions.find((stockItem) => stockItem.id === event.target.value);
+                  setItem((current) => ({
+                    ...current,
                     id: selected ? selected.id : "",
-                    name: selected ? selected.name : "",
-                  });
+                    name: selected ? selected.name : ""
+                  }));
                 }}
                 required
-                disabled={isSubmitting}
+                disabled={isSubmitting || !item.category}
               >
                 <option value="">Select Item ID</option>
-                {getStockArray().map((stockItem) => (
+                {stockOptions.map((stockItem) => (
                   <option key={stockItem.id} value={stockItem.id}>
                     {stockItem.id} - {stockItem.name}
                   </option>
                 ))}
               </select>
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
         <div className="form-row">
@@ -155,7 +182,7 @@ const InventoryForm = ({ setInventory }) => {
               type="text"
               placeholder="Enter item name"
               value={item.name}
-              onChange={(e) => setItem({ ...item, name: e.target.value })}
+              onChange={(event) => updateItem("name", event.target.value)}
               required
               disabled={isSubmitting}
             />
@@ -168,7 +195,7 @@ const InventoryForm = ({ setInventory }) => {
               type="text"
               placeholder="Enter item type"
               value={item.type}
-              onChange={(e) => setItem({ ...item, type: e.target.value })}
+              onChange={(event) => updateItem("type", event.target.value)}
               required
               disabled={isSubmitting}
             />
@@ -183,9 +210,7 @@ const InventoryForm = ({ setInventory }) => {
               type="number"
               placeholder="Enter quantity"
               value={item.quantity}
-              onChange={(e) =>
-                setItem({ ...item, quantity: parseInt(e.target.value) || 0 })
-              }
+              onChange={(event) => updateItem("quantity", Number.parseInt(event.target.value, 10) || 0)}
               min="0"
               required
               disabled={isSubmitting}
@@ -193,64 +218,55 @@ const InventoryForm = ({ setInventory }) => {
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: '15px', marginTop: '20px' }}>
-          <button 
-            type="submit" 
-            className="btn btn-primary"
-            disabled={isSubmitting}
-            style={{ flex: '1' }}
-          >
-            {isSubmitting ? "Adding Item..." : "Add Item"}
+        <div style={{ display: "flex", gap: "15px", marginTop: "20px" }}>
+          <button type="submit" className="btn btn-primary" disabled={isSubmitting} style={{ flex: "1" }}>
+            {isSubmitting ? (isEdit ? "Saving..." : "Adding Item...") : isEdit ? "Save Changes" : "Add Item"}
           </button>
-          
-          <button 
-            type="button" 
-            className="btn btn-secondary"
-            onClick={resetForm}
-            disabled={isSubmitting}
-            style={{ flex: '1' }}
-          >
-            Reset Form
+
+          <button type="button" className="btn btn-secondary" onClick={isEdit ? onCancel : resetForm} disabled={isSubmitting} style={{ flex: "1" }}>
+            {isEdit ? "Cancel" : "Reset Form"}
           </button>
         </div>
       </form>
 
-      {fetchedItems.length > 0 && (
-        <div style={{ marginTop: '30px' }}>
-          <h4 style={{ marginBottom: '15px', color: '#2c3e50' }}>
-            Current Inventory Items ({fetchedItems.length})
-          </h4>
-          <div style={{ 
-            display: 'grid', 
-            gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', 
-            gap: '10px' 
-          }}>
+      {!isEdit && fetchedItems.length > 0 && (
+        <div style={{ marginTop: "30px" }}>
+          <h4 style={{ marginBottom: "15px", color: "#2c3e50" }}>Current Inventory Items ({fetchedItems.length})</h4>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(250px, 1fr))",
+              gap: "10px"
+            }}
+          >
             {fetchedItems.slice(0, 6).map((fetchedItem) => (
-              <div 
+              <div
                 key={fetchedItem.id}
                 style={{
-                  padding: '10px',
-                  background: '#f8f9fa',
-                  borderRadius: '8px',
-                  border: '1px solid #e1e8ed',
-                  fontSize: '14px'
+                  padding: "10px",
+                  background: "#f8f9fa",
+                  borderRadius: "8px",
+                  border: "1px solid #e1e8ed",
+                  fontSize: "14px"
                 }}
               >
                 <strong>{fetchedItem.name}</strong>
-                <div style={{ color: '#666', fontSize: '12px' }}>
+                <div style={{ color: "#666", fontSize: "12px" }}>
                   Qty: {fetchedItem.quantity} | {fetchedItem.category}
                 </div>
               </div>
             ))}
             {fetchedItems.length > 6 && (
-              <div style={{ 
-                padding: '10px', 
-                background: '#e3f2fd', 
-                borderRadius: '8px',
-                textAlign: 'center',
-                color: '#1976d2',
-                fontSize: '14px'
-              }}>
+              <div
+                style={{
+                  padding: "10px",
+                  background: "#e3f2fd",
+                  borderRadius: "8px",
+                  textAlign: "center",
+                  color: "#1976d2",
+                  fontSize: "14px"
+                }}
+              >
                 +{fetchedItems.length - 6} more items
               </div>
             )}
@@ -262,7 +278,11 @@ const InventoryForm = ({ setInventory }) => {
 };
 
 InventoryForm.propTypes = {
-  setInventory: PropTypes.func.isRequired,
+  setInventory: PropTypes.func,
+  initialItem: PropTypes.object,
+  onSubmit: PropTypes.func,
+  onCancel: PropTypes.func,
+  isEdit: PropTypes.bool
 };
 
 export default InventoryForm;

@@ -1,219 +1,296 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import PropTypes from "prop-types";
+import { useAuth } from "../Context/AuthContext.js";
+import { useDepartments } from "../Context/DepartmentsContext.js";
+import StateNotice from "./ui/StateNotice.jsx";
+import StatusBadge from "./ui/StatusBadge.jsx";
+import { api } from "../utils/api.js";
+import { getBatchStatusMeta } from "../utils/requisitionStatus.js";
+
+const getItemDetails = (inventory, itemId) => {
+  const item = inventory.find((entry) => entry.id === itemId);
+  return item ? { name: item.name, category: item.category, type: item.type } : { name: itemId, category: "", type: "" };
+};
+
+const getVisibleBatchesForRole = (batches, role, departmentId) =>
+  batches.filter((batch) => {
+    const first = batch[0];
+
+    if (role === "account") {
+      return first.status === "pending" && String(first.department_id) === String(departmentId);
+    }
+
+    if (role === "account_manager") {
+      return (
+        (first.status === "branch_account_approved" && first.department !== "Head Office") ||
+        (first.status === "hod_approved" && !first.is_it_item) ||
+        first.status === "it_approved"
+      );
+    }
+
+    if (role === "stores") {
+      return first.status === "ho_account_approved" && first.department === "Head Office";
+    }
+
+    if (role === "hod" || role === "deputy_hod") {
+      return first.status === "pending" && String(first.department_id) === String(departmentId);
+    }
+
+    if (role === "it_manager") {
+      return first.status === "hod_approved" && first.is_it_item;
+    }
+
+    return false;
+  });
+
+const sortBatches = (batches, sortKey, sortAsc) => {
+  if (!sortKey) {
+    return batches;
+  }
+
+  return [...batches].sort((left, right) => {
+    const leftValue = left[0][sortKey] || "";
+    const rightValue = right[0][sortKey] || "";
+
+    if (leftValue < rightValue) {
+      return sortAsc ? -1 : 1;
+    }
+
+    if (leftValue > rightValue) {
+      return sortAsc ? 1 : -1;
+    }
+
+    return 0;
+  });
+};
 
 const RequisitionApproval = ({ setNotification, inventory }) => {
   const [requisitions, setRequisitions] = useState([]);
   const [message, setMessage] = useState("");
-  const token = localStorage.getItem("token");
-  const role = localStorage.getItem("role");
-  const [filterDept, setFilterDept] = useState('');
-  const [filterStatus, setFilterStatus] = useState('');
-  const [sortKey, setSortKey] = useState('');
+  const [filterDept, setFilterDept] = useState("");
+  const [filterStatus, setFilterStatus] = useState("");
+  const [sortKey, setSortKey] = useState("");
   const [sortAsc, setSortAsc] = useState(true);
-  const departmentId = localStorage.getItem("department_id");
-  const [departments, setDepartments] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const { token, role, departmentId } = useAuth();
+  const { departments } = useDepartments();
 
-  useEffect(() => {
-    fetchRequisitions();
-    // Fetch departments
-    const fetchDepartments = async () => {
-      try {
-        const token = localStorage.getItem("token");
-        const res = await fetch("http://localhost:5000/departments", {
-          headers: { Authorization: "Bearer " + token }
-        });
-        if (res.ok) setDepartments(await res.json());
-      } catch {}
-    };
-    fetchDepartments();
-    // eslint-disable-next-line
-  }, []);
+  const showFeedback = (nextMessage) => {
+    setMessage(nextMessage);
+
+    if (setNotification) {
+      setNotification(nextMessage);
+      setTimeout(() => setNotification(""), 3000);
+    }
+  };
 
   const fetchRequisitions = async () => {
-    const res = await fetch("http://localhost:5000/requisitions", {
-      headers: { Authorization: "Bearer " + token }
-    });
-    const data = await res.json();
-    setRequisitions(data);
+    setIsLoading(true);
+
+    try {
+      const data = await api.getRequisitions();
+      setRequisitions(Array.isArray(data) ? data : []);
+    } catch (error) {
+      setRequisitions([]);
+      setMessage(error.message || "Failed to load requisitions.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  // Group requisitions by batch_id
-  const batches = {};
-  requisitions.forEach(req => {
-    if (!batches[req.batch_id]) batches[req.batch_id] = [];
-    batches[req.batch_id].push(req);
-  });
+  useEffect(() => {
+    if (!token) {
+      setRequisitions([]);
+      setIsLoading(false);
+      return;
+    }
 
-  // Only show batches relevant to the current role and approval step
-  let filteredBatches = Object.values(batches).filter(batch => {
-    const first = batch[0];
-    // Branch stores submits: status = 'pending', next is branch account
-    if (role === "account" && first.status === "pending") {
-      // Only show if department matches user's department (branch)
-      return String(first.department_id) === String(departmentId);
-    }
-    // Head office account: after branch account approves
-    if (role === "account_manager" && first.status === "account_approved" && first.department !== "Head Office") {
-      return true;
-    }
-    // Head office stores: after head office account approves
-    if (role === "stores" && first.status === "ho_account_approved" && first.department === "Head Office") {
-      return true;
-    }
-    // Existing logic for HOD, IT, etc.
-    if (role === "hod" || role === "deputy_hod") {
-      return first.status === "pending" && String(first.department_id) === String(departmentId);
-    }
-    if (role === "it_manager") return first.status === "hod_approved" && first.is_it_item;
-    return false;
-  });
+    fetchRequisitions();
+  }, [token]);
 
-  // Filtering
-  if (filterDept) {
-    filteredBatches = filteredBatches.filter(batch => batch[0].department === filterDept);
-  }
-  if (filterStatus) {
-    filteredBatches = filteredBatches.filter(batch => batch[0].status === filterStatus);
-  }
+  const batches = useMemo(() => {
+    const grouped = {};
 
-  // Sorting
-  if (sortKey) {
-    filteredBatches.sort((a, b) => {
-      const valA = a[0][sortKey] || '';
-      const valB = b[0][sortKey] || '';
-      if (valA < valB) return sortAsc ? -1 : 1;
-      if (valA > valB) return sortAsc ? 1 : -1;
-      return 0;
+    requisitions.forEach((requisition) => {
+      if (!grouped[requisition.batch_id]) {
+        grouped[requisition.batch_id] = [];
+      }
+
+      grouped[requisition.batch_id].push(requisition);
     });
-  }
 
-  // Get unique departments and statuses for filter dropdowns
-  const allDepts = Array.from(new Set(requisitions.map(r => r.department))).filter(Boolean);
-  const allStatuses = Array.from(new Set(requisitions.map(r => r.status))).filter(Boolean);
+    return Object.values(grouped);
+  }, [requisitions]);
 
-  // Helper to get overall batch status and icon
-  const getBatchStatus = (batch) => {
-    const statuses = batch.map(r => r.status);
-    if (statuses.every(s => s === 'fulfilled')) return { label: 'Fulfilled', icon: '✅', color: '#28a745' };
-    if (statuses.every(s => s === 'account_approved')) return { label: 'Approved', icon: '✔️', color: '#1976d2' };
-    if (statuses.every(s => s === 'pending')) return { label: 'Pending', icon: '⏳', color: '#ffc107' };
-    if (statuses.some(s => s === 'rejected')) return { label: 'Rejected', icon: '❌', color: '#dc3545' };
-    return { label: 'In Progress', icon: '🔄', color: '#888' };
+  const filteredBatches = useMemo(() => {
+    let visibleBatches = getVisibleBatchesForRole(batches, role, departmentId);
+
+    if (filterDept) {
+      visibleBatches = visibleBatches.filter((batch) => batch[0].department === filterDept);
+    }
+
+    if (filterStatus) {
+      visibleBatches = visibleBatches.filter((batch) => batch[0].status === filterStatus);
+    }
+
+    return sortBatches(visibleBatches, sortKey, sortAsc);
+  }, [batches, departmentId, filterDept, filterStatus, role, sortAsc, sortKey]);
+
+  const allDepts = useMemo(
+    () => Array.from(new Set(requisitions.map((entry) => entry.department))).filter(Boolean),
+    [requisitions]
+  );
+  const allStatuses = useMemo(
+    () => Array.from(new Set(requisitions.map((entry) => entry.status))).filter(Boolean),
+    [requisitions]
+  );
+
+  const getDepartmentName = (id) => {
+    const department = departments.find((entry) => String(entry.id) === String(id));
+    return department ? department.name : id;
   };
 
-  const handleBatchApprove = async (batch_id) => {
+  const handleBatchApprove = async (batchId) => {
     setMessage("");
-    const res = await fetch(`http://localhost:5000/requisitions/0/approve`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
-      body: JSON.stringify({ batch_id })
-    });
-    const data = await res.json();
-    if (res.ok && data.success) {
-      if (setNotification) {
-        setNotification("Batch approved!");
-        setTimeout(() => setNotification(""), 3000);
-      } else {
-        setMessage("Batch approved!");
+
+    try {
+      const data = await api.approveRequisition(0, { batch_id: batchId });
+      if (data.success) {
+        showFeedback("Batch approved!");
+        await fetchRequisitions();
       }
-      fetchRequisitions();
-    } else {
-      if (setNotification) {
-        setNotification(data.error || "Approval failed.");
-        setTimeout(() => setNotification(""), 3000);
-      } else {
-        setMessage(data.error || "Approval failed.");
-      }
+    } catch (error) {
+      showFeedback(error.message || "Approval failed.");
     }
   };
 
   const exportBatchToCSV = (batch) => {
-    const headers = ['Item', 'Category', 'Type', 'Quantity', 'Status'];
-    const rows = batch.map(req => {
-      const details = getItemDetails(req.item_id);
-      return [details.name, details.category, details.type, req.quantity, req.status];
+    const headers = ["Item", "Category", "Type", "Quantity", "Status"];
+    const rows = batch.map((requisition) => {
+      const details = getItemDetails(inventory, requisition.item_id);
+      return [details.name, details.category, details.type, requisition.quantity, requisition.status];
     });
-    let csvContent = headers.join(',') + '\n' + rows.map(r => r.map(x => '"' + String(x).replace(/"/g, '""') + '"').join(',')).join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const csvContent = `${headers.join(",")}\n${rows
+      .map((row) => row.map((value) => `"${String(value).replace(/"/g, '""')}"`).join(","))
+      .join("\n")}`;
+    const blob = new Blob([csvContent], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `batch_${batch[0].batch_id}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `batch_${batch[0].batch_id}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
     URL.revokeObjectURL(url);
   };
 
-  const getItemDetails = (id) => {
-    const item = inventory.find(i => i.id === id);
-    return item ? { name: item.name, category: item.category, type: item.type } : { name: id, category: '', type: '' };
-  };
-
-  const getDeptName = (id) => {
-    const dept = departments.find(d => String(d.id) === String(id));
-    return dept ? dept.name : id;
+  const handleSortChange = (nextSortKey) => {
+    setSortKey(nextSortKey);
+    setSortAsc((current) => (sortKey === nextSortKey ? !current : true));
   };
 
   return (
     <div>
       <h2>Requisitions to Approve</h2>
-      <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
-        <label>
+
+      <div style={{ display: "flex", gap: 16, marginBottom: 16, flexWrap: "wrap" }}>
+        <label htmlFor="approval-filter-department">
           Department:
-          <select value={filterDept} onChange={e => setFilterDept(e.target.value)} style={{ marginLeft: 8 }}>
+          <select
+            id="approval-filter-department"
+            value={filterDept}
+            onChange={(event) => setFilterDept(event.target.value)}
+            style={{ marginLeft: 8 }}
+          >
             <option value="">All</option>
-            {allDepts.map(dept => <option key={dept} value={dept}>{dept}</option>)}
+            {allDepts.map((department) => (
+              <option key={department} value={department}>
+                {department}
+              </option>
+            ))}
           </select>
         </label>
-        <label>
+
+        <label htmlFor="approval-filter-status">
           Status:
-          <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} style={{ marginLeft: 8 }}>
+          <select
+            id="approval-filter-status"
+            value={filterStatus}
+            onChange={(event) => setFilterStatus(event.target.value)}
+            style={{ marginLeft: 8 }}
+          >
             <option value="">All</option>
-            {allStatuses.map(status => <option key={status} value={status}>{status}</option>)}
+            {allStatuses.map((status) => (
+              <option key={status} value={status}>
+                {status}
+              </option>
+            ))}
           </select>
         </label>
       </div>
-      {(!setNotification && message) && <div>{message}</div>}
-      {filteredBatches.length === 0 ? (
-        <div>No requisitions to approve.</div>
+
+      {message && <StateNotice>{message}</StateNotice>}
+
+      {isLoading ? (
+        <StateNotice>Loading...</StateNotice>
+      ) : filteredBatches.length === 0 ? (
+        <StateNotice>No requisitions to approve.</StateNotice>
       ) : (
-        filteredBatches.map(batch => (
-          <div key={batch[0].batch_id} style={{ border: '1px solid #e1e8ed', borderRadius: 8, marginBottom: 24, padding: 16, background: '#fafbfc' }}>
-            <div style={{ marginBottom: 8, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 16 }}>
-              Batch ID: {batch[0].batch_id} | Department: {getDeptName(batch[0].department_id)} | IT Item: {batch[0].is_it_item ? 'Yes' : 'No'}
-              <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6, color: getBatchStatus(batch).color, fontWeight: 700 }}>
-                <span style={{ fontSize: 20 }}>{getBatchStatus(batch).icon}</span>
-                {getBatchStatus(batch).label}
-              </span>
+        filteredBatches.map((batch) => (
+          <div key={batch[0].batch_id} className="batch-card">
+            <div className="batch-card__header">
+              Batch ID: {batch[0].batch_id} | Department: {getDepartmentName(batch[0].department_id)} | IT Item:{" "}
+              {batch[0].is_it_item ? "Yes" : "No"}
+              <StatusBadge color={getBatchStatusMeta(batch).color} className="batch-card__status">
+                <span style={{ fontSize: 14 }}>{getBatchStatusMeta(batch).icon}</span>
+                {getBatchStatusMeta(batch).label}
+              </StatusBadge>
             </div>
-            <table style={{ width: '100%', marginBottom: 12 }}>
+
+            <table className="table-compact">
               <thead>
                 <tr>
-                  <th style={{ cursor: 'pointer' }} onClick={() => { setSortKey('item_id'); setSortAsc(sortKey === 'item_id' ? !sortAsc : true); }}>Item</th>
-                  <th style={{ cursor: 'pointer' }} onClick={() => { setSortKey('category'); setSortAsc(sortKey === 'category' ? !sortAsc : true); }}>Category</th>
-                  <th style={{ cursor: 'pointer' }} onClick={() => { setSortKey('type'); setSortAsc(sortKey === 'type' ? !sortAsc : true); }}>Type</th>
-                  <th style={{ cursor: 'pointer' }} onClick={() => { setSortKey('quantity'); setSortAsc(sortKey === 'quantity' ? !sortAsc : true); }}>Quantity</th>
-                  <th style={{ cursor: 'pointer' }} onClick={() => { setSortKey('status'); setSortAsc(sortKey === 'status' ? !sortAsc : true); }}>Status</th>
+                  <th onClick={() => handleSortChange("item_id")}>
+                    Item
+                  </th>
+                  <th onClick={() => handleSortChange("category")}>
+                    Category
+                  </th>
+                  <th onClick={() => handleSortChange("type")}>
+                    Type
+                  </th>
+                  <th onClick={() => handleSortChange("quantity")}>
+                    Quantity
+                  </th>
+                  <th onClick={() => handleSortChange("status")}>
+                    Status
+                  </th>
                 </tr>
               </thead>
               <tbody>
-                {batch.map((req, idx) => {
-                  const details = getItemDetails(req.item_id);
+                {batch.map((requisition, index) => {
+                  const details = getItemDetails(inventory, requisition.item_id);
                   return (
-                    <tr key={req.id} style={{ background: idx % 2 === 0 ? '#f4f6fa' : '#fff' }}>
+                    <tr key={requisition.id} className={index % 2 === 0 ? "row-alt" : ""}>
                       <td>{details.name}</td>
                       <td>{details.category}</td>
                       <td>{details.type}</td>
-                      <td>{req.quantity}</td>
-                      <td title={`Status: ${req.status}`}>{req.status}</td>
+                      <td>{requisition.quantity}</td>
+                      <td title={`Status: ${requisition.status}`}>{requisition.status}</td>
                     </tr>
                   );
                 })}
               </tbody>
             </table>
-            <button className="btn btn-primary" onClick={() => handleBatchApprove(batch[0].batch_id)}>Approve Batch</button>
-            <button className="btn btn-secondary" style={{ marginLeft: 12 }} onClick={() => exportBatchToCSV(batch)}>Export CSV</button>
+
+            <div className="batch-card__footer" style={{ justifyContent: "flex-start", gap: 12 }}>
+              <button className="btn btn-primary" onClick={() => handleBatchApprove(batch[0].batch_id)}>
+                Approve Batch
+              </button>
+              <button className="btn btn-secondary" onClick={() => exportBatchToCSV(batch)}>
+                Export CSV
+              </button>
+            </div>
           </div>
         ))
       )}
@@ -223,7 +300,7 @@ const RequisitionApproval = ({ setNotification, inventory }) => {
 
 RequisitionApproval.propTypes = {
   setNotification: PropTypes.func,
-  inventory: PropTypes.array.isRequired,
+  inventory: PropTypes.array.isRequired
 };
 
-export default RequisitionApproval; 
+export default RequisitionApproval;

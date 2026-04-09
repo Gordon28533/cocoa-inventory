@@ -1,14 +1,25 @@
-import React, { useState } from "react";
+import React, { useState, useLayoutEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../Context/AuthContext.js";
+import { api } from "../utils/api.js";
 import "../styles.css";
 
-const LoginPage = ({ setToken, setRole }) => {
+const LoginPage = () => {
   const [staffName, setStaffName] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [goToUserManager, setGoToUserManager] = useState(false);
   const navigate = useNavigate();
+  const { login } = useAuth();
+
+  // Prevent flicker on mount (e.g., autofill, focus, etc.)
+  useLayoutEffect(() => {
+    // Optionally, focus the staffName input on mount
+    const input = document.getElementById('staffName');
+    if (input) input.focus();
+  }, []);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -16,38 +27,24 @@ const LoginPage = ({ setToken, setRole }) => {
     setError("");
 
     try {
-      const response = await fetch(`http://localhost:5000/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ staffName, password }),
-      });
-      
-      const data = await response.json();
-      
-      if (response.ok && data.success && data.token) {
-        localStorage.setItem("user", staffName);
-        localStorage.setItem("token", data.token);
-        if (data.role) {
-          localStorage.setItem("role", data.role);
-        }
-        if (data.department_id !== undefined) {
-          localStorage.setItem("department_id", data.department_id);
-        }
-        if (setToken) setToken(data.token);
-        if (setRole && data.role) setRole(data.role);
+      const data = await api.login({ staffName, password });
+
+      if (data.success && data.token) {
+        login({
+          token: data.token,
+          role: data.role,
+          user: staffName,
+          departmentId: data.department_id
+        });
+
         if (data.role === 'admin' && goToUserManager) {
           navigate("/admin/users");
-          window.location.reload();
-        } else if (data.role === 'admin') {
-          navigate("/dashboard"); // Default for admin if not checked
         } else {
-        navigate("/dashboard");
+          navigate("/dashboard");
         }
-      } else {
-        setError(data.message || "Invalid credentials!");
       }
     } catch (err) {
-      setError("Network error. Please check your connection.");
+      setError(err.message || "Network error. Please check your connection.");
     } finally {
       setIsLoading(false);
     }
@@ -72,40 +69,65 @@ const LoginPage = ({ setToken, setRole }) => {
       <form onSubmit={handleLogin} aria-label="Login form">
         <div className="form-group">
           <label htmlFor="staffName">Staff Name</label>
-          <input
-            id="staffName"
-            type="text"
-            placeholder="Enter your staff name"
-            value={staffName}
-            onChange={(e) => setStaffName(e.target.value)}
-            required
-            disabled={isLoading}
-            aria-describedby={error ? "login-error" : undefined}
-          />
+            <input
+              id="staffName"
+              name="staffName"
+              type="text"
+              placeholder="Enter your staff name"
+              value={staffName}
+              onChange={(e) => setStaffName(e.target.value)}
+              required
+              disabled={isLoading}
+              autoComplete="username"
+              aria-describedby={error ? "login-error" : undefined}
+            />
         </div>
         
         <div className="form-group">
-          <label htmlFor="password">Password</label>
-          <input
-            id="password"
-            type="password"
-            placeholder="Enter your password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            disabled={isLoading}
-          />
+          <label htmlFor="password" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span>Password</span>
+            <button
+              type="button"
+              onClick={() => setShowPassword((v) => !v)}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#1976d2',
+                cursor: 'pointer',
+                fontSize: 13,
+                padding: 0,
+                marginLeft: 8
+              }}
+              tabIndex={-1}
+              aria-label={showPassword ? "Hide password" : "Show password"}
+            >
+              {showPassword ? 'Hide' : 'Show'}
+            </button>
+          </label>
+            <input
+              id="password"
+              name="password"
+              type={showPassword ? "text" : "password"}
+              placeholder="Enter your password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              disabled={isLoading}
+              autoComplete="current-password"
+            />
         </div>
         {/* Admin shortcut option */}
         <div className="form-group" style={{ marginBottom: 16 }}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <label htmlFor="goToUserManager" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <input
-              type="checkbox"
-              checked={goToUserManager}
-              onChange={e => setGoToUserManager(e.target.checked)}
-              disabled={isLoading}
-            />
-            Go directly to User Management (admin only)
+                id="goToUserManager"
+                name="goToUserManager"
+                type="checkbox"
+                checked={goToUserManager}
+                onChange={e => setGoToUserManager(e.target.checked)}
+                disabled={isLoading}
+              />
+              Go directly to User Management (admin only)
           </label>
         </div>
         <button 

@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { api } from "../utils/api.js";
 
 const ChangePasswordPage = () => {
   const [oldPassword, setOldPassword] = useState("");
@@ -22,24 +23,13 @@ const ChangePasswordPage = () => {
     }
     setLoading(true);
     try {
-      const token = localStorage.getItem("token");
-      const res = await fetch("http://localhost:5000/change-password", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({ oldPassword, newPassword })
-      });
-      const data = await res.json();
-      if (res.ok && data.success) {
+      const data = await api.changePassword({ oldPassword, newPassword });
+      if (data.success) {
         setMessage("Password changed successfully!");
         setOldPassword(""); setNewPassword(""); setConfirmPassword("");
-      } else {
-        setMessage(data.error || data.message || "Failed to change password.");
       }
     } catch (err) {
-      setMessage("Network error. Please try again.");
+      setMessage(err.message || "Network error. Please try again.");
     } finally {
       setLoading(false);
     }

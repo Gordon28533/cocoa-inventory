@@ -1,61 +1,28 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
+import { useDepartments } from "../Context/DepartmentsContext.js";
+import { api } from "../utils/api.js";
 import PropTypes from "prop-types";
 
 const DepartmentManager = ({ setNotification }) => {
-  const [departments, setDepartments] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const { departments, loading, error, refreshDepartments } = useDepartments();
   const [newDept, setNewDept] = useState({ name: "", description: "" });
   const [editDeptId, setEditDeptId] = useState(null);
   const [editDept, setEditDept] = useState({ name: "", description: "" });
   const [saving, setSaving] = useState(false);
-  const token = localStorage.getItem("token");
 
-  useEffect(() => {
-    fetchDepartments();
-    // eslint-disable-next-line
-  }, []);
-
-  const fetchDepartments = async () => {
-    setLoading(true);
-    try {
-      const res = await fetch("http://localhost:5000/departments", {
-        headers: { Authorization: "Bearer " + token }
-      });
-      if (res.ok) {
-        setDepartments(await res.json());
-      } else {
-        setNotification && setNotification("Failed to fetch departments");
-      }
-    } catch (err) {
-      setNotification && setNotification("Server error fetching departments");
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Departments are now provided by context
 
   const handleAdd = async (e) => {
     e.preventDefault();
     if (!newDept.name.trim()) return;
     setSaving(true);
     try {
-      const res = await fetch("http://localhost:5000/departments", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: "Bearer " + token
-        },
-        body: JSON.stringify(newDept)
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setNotification && setNotification("Department added");
-        setNewDept({ name: "", description: "" });
-        fetchDepartments();
-      } else {
-        setNotification && setNotification(data.error || "Failed to add department");
-      }
+      await api.createDepartment(newDept);
+      setNotification && setNotification("Department added");
+      setNewDept({ name: "", description: "" });
+      refreshDepartments();
     } catch (err) {
-      setNotification && setNotification("Server error");
+      setNotification && setNotification(err.message || "Server error");
     } finally {
       setSaving(false);
     }
@@ -70,24 +37,12 @@ const DepartmentManager = ({ setNotification }) => {
     if (!editDept.name.trim()) return;
     setSaving(true);
     try {
-      const res = await fetch(`http://localhost:5000/departments/${id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: "Bearer " + token
-        },
-        body: JSON.stringify(editDept)
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setNotification && setNotification("Department updated");
-        setEditDeptId(null);
-        fetchDepartments();
-      } else {
-        setNotification && setNotification(data.error || "Failed to update department");
-      }
+      await api.updateDepartment(id, editDept);
+      setNotification && setNotification("Department updated");
+      setEditDeptId(null);
+      refreshDepartments();
     } catch (err) {
-      setNotification && setNotification("Server error");
+      setNotification && setNotification(err.message || "Server error");
     } finally {
       setSaving(false);
     }
@@ -97,19 +52,11 @@ const DepartmentManager = ({ setNotification }) => {
     if (!window.confirm("Are you sure you want to delete this department?")) return;
     setSaving(true);
     try {
-      const res = await fetch(`http://localhost:5000/departments/${id}`, {
-        method: "DELETE",
-        headers: { Authorization: "Bearer " + token }
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setNotification && setNotification("Department deleted");
-        fetchDepartments();
-      } else {
-        setNotification && setNotification(data.error || "Failed to delete department");
-      }
+      await api.deleteDepartment(id);
+      setNotification && setNotification("Department deleted");
+      refreshDepartments();
     } catch (err) {
-      setNotification && setNotification("Server error");
+      setNotification && setNotification(err.message || "Server error");
     } finally {
       setSaving(false);
     }
