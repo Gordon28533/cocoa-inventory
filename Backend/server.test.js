@@ -1,12 +1,21 @@
-import fetch from "node-fetch";
+import { describe, it } from "node:test";
+import assert from "node:assert/strict";
+import { createMockDatabaseManager, fetchJson, withTestApp } from "./testUtils.js";
 
 describe("Backend /health endpoint", () => {
-  it("should return status ok and database status", async () => {
-    const response = await fetch("http://localhost:5000/health");
-    expect(response.status).toBe(200);
-    const data = await response.json();
-    expect(data).toHaveProperty("status", "ok");
-    expect(data).toHaveProperty("database");
-    expect(data).toHaveProperty("timestamp");
+  it("returns status, database state, and timestamp", async () => {
+    await withTestApp(
+      {
+        databaseManager: createMockDatabaseManager()
+      },
+      async ({ baseUrl }) => {
+        const { response, data } = await fetchJson(baseUrl, "/health");
+
+        assert.equal(response.status, 200);
+        assert.equal(data.status, "ok");
+        assert.equal(data.database, "disconnected");
+        assert.ok(Object.hasOwn(data, "timestamp"));
+      }
+    );
   });
-}); 
+});
