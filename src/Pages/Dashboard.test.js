@@ -152,7 +152,7 @@ describe("Dashboard", () => {
   it("shows the approvals tab for branch account users", () => {
     renderDashboard({ role: "account" });
 
-    expect(screen.getByText(/Approvals/i)).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /^Approvals$/i })).toBeInTheDocument();
     expect(screen.queryByText(/My Requisitions/i)).not.toBeInTheDocument();
   });
 
@@ -161,7 +161,7 @@ describe("Dashboard", () => {
 
     renderDashboard({ role: "user", user: "Grace", currentPath: "/dashboard", setCurrentPath });
 
-    fireEvent.click(screen.getByRole("button", { name: /^Requisition$/i }));
+    fireEvent.click(screen.getByRole("tab", { name: /^Requisition$/i }));
 
     expect(await screen.findByText(/Create Requisition Stub/i)).toBeInTheDocument();
     expect(setCurrentPath).toHaveBeenCalledWith("/dashboard?tab=requisition");

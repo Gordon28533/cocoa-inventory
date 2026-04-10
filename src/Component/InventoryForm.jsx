@@ -4,6 +4,7 @@ import tonerStock from "../data/tonerStock";
 import stationeryStock from "../data/stationeryStock";
 import generalStock from "../data/generalStock";
 import { useAuth } from "../Context/AuthContext.js";
+import StateNotice from "./ui/StateNotice.jsx";
 import { api } from "../utils/api.js";
 
 const EMPTY_ITEM = {
@@ -34,6 +35,9 @@ const InventoryForm = ({
   const [fetchedItems, setFetchedItems] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState("");
+  const categoryHelpId = "inventory-form-category-help";
+  const quantityHelpId = "inventory-form-quantity-help";
+  const messageId = message ? "inventory-form-message" : undefined;
 
   useEffect(() => {
     setItem(normalizeItem(initialItem || EMPTY_ITEM));
@@ -112,12 +116,10 @@ const InventoryForm = ({
   return (
     <div>
       {message && (
-        <div
-          className={message.toLowerCase().includes("success") ? "success" : "error"}
-          role="alert"
-          aria-live="polite"
-        >
-          {message}
+        <div id="inventory-form-message">
+          <StateNotice tone={message.toLowerCase().includes("success") ? "success" : "error"}>
+            {message}
+          </StateNotice>
         </div>
       )}
 
@@ -136,12 +138,16 @@ const InventoryForm = ({
               }))}
               required
               disabled={isSubmitting || isEdit}
+              aria-describedby={categoryHelpId}
             >
               <option value="">Select Category</option>
               <option value="Toner Stock">Toner Stock</option>
               <option value="Stationery Stock">Stationery Stock</option>
               <option value="General Stock">General Stock</option>
             </select>
+            <span id={categoryHelpId} className="field-help">
+              Choose a stock category first to unlock the matching item IDs.
+            </span>
           </div>
 
           <div className="form-group">
@@ -214,64 +220,49 @@ const InventoryForm = ({
               min="0"
               required
               disabled={isSubmitting}
+              aria-describedby={[quantityHelpId, messageId].filter(Boolean).join(" ") || undefined}
             />
+            <span id={quantityHelpId} className="field-help">
+              Enter the available stock quantity you want recorded for this item.
+            </span>
           </div>
         </div>
 
-        <div style={{ display: "flex", gap: "15px", marginTop: "20px" }}>
-          <button type="submit" className="btn btn-primary" disabled={isSubmitting} style={{ flex: "1" }}>
+        <div className="modal-actions inventory-form__actions">
+          <button type="submit" className="btn btn-primary inventory-form__action-button" disabled={isSubmitting}>
             {isSubmitting ? (isEdit ? "Saving..." : "Adding Item...") : isEdit ? "Save Changes" : "Add Item"}
           </button>
 
-          <button type="button" className="btn btn-secondary" onClick={isEdit ? onCancel : resetForm} disabled={isSubmitting} style={{ flex: "1" }}>
+          <button
+            type="button"
+            className="btn btn-secondary inventory-form__action-button"
+            onClick={isEdit ? onCancel : resetForm}
+            disabled={isSubmitting}
+          >
             {isEdit ? "Cancel" : "Reset Form"}
           </button>
         </div>
       </form>
 
       {!isEdit && fetchedItems.length > 0 && (
-        <div style={{ marginTop: "30px" }}>
-          <h4 style={{ marginBottom: "15px", color: "#2c3e50" }}>Current Inventory Items ({fetchedItems.length})</h4>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(250px, 1fr))",
-              gap: "10px"
-            }}
-          >
+        <section className="inventory-preview" aria-label="Current inventory preview">
+          <h4 className="inventory-preview__title">Current Inventory Items ({fetchedItems.length})</h4>
+          <div className="inventory-preview__grid">
             {fetchedItems.slice(0, 6).map((fetchedItem) => (
-              <div
-                key={fetchedItem.id}
-                style={{
-                  padding: "10px",
-                  background: "#f8f9fa",
-                  borderRadius: "8px",
-                  border: "1px solid #e1e8ed",
-                  fontSize: "14px"
-                }}
-              >
+              <div key={fetchedItem.id} className="inventory-preview__card">
                 <strong>{fetchedItem.name}</strong>
-                <div style={{ color: "#666", fontSize: "12px" }}>
+                <div className="inventory-preview__meta">
                   Qty: {fetchedItem.quantity} | {fetchedItem.category}
                 </div>
               </div>
             ))}
             {fetchedItems.length > 6 && (
-              <div
-                style={{
-                  padding: "10px",
-                  background: "#e3f2fd",
-                  borderRadius: "8px",
-                  textAlign: "center",
-                  color: "#1976d2",
-                  fontSize: "14px"
-                }}
-              >
+              <div className="inventory-preview__more">
                 +{fetchedItems.length - 6} more items
               </div>
             )}
           </div>
-        </div>
+        </section>
       )}
     </div>
   );

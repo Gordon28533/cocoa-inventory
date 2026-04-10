@@ -75,7 +75,7 @@ describe("RequisitionApproval", () => {
       expect(api.approveRequisition).toHaveBeenCalledWith(0, { batch_id: "B-1" });
     });
 
-    expect(setNotification).toHaveBeenCalledWith("Batch approved!");
+    expect(setNotification).toHaveBeenCalledWith("Batch approved successfully.");
     expect(api.getRequisitions).toHaveBeenCalledTimes(2);
   });
 });

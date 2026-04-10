@@ -14,13 +14,16 @@ describe("LoginPage", () => {
       </AuthContext.Provider>
     );
 
-  it("renders the login form fields and admin shortcut", () => {
+  it("renders the login form fields", () => {
     renderLoginPage();
 
     expect(screen.getByText(/Welcome Back/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/Staff Name/i)).toBeInTheDocument();
     expect(screen.getByPlaceholderText(/Enter your password/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/Go directly to User Management/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Go directly to User Management/i)).not.toBeInTheDocument();
+    expect(document.title).toBe("Sign In | CMC Inventory");
+    expect(screen.getByLabelText(/Staff Name/i)).toHaveAttribute("aria-describedby", expect.stringContaining("login-subtitle"));
+    expect(screen.getByPlaceholderText(/Enter your password/i)).toHaveAttribute("aria-describedby", expect.stringContaining("login-help"));
   });
 
   it("toggles password visibility", () => {

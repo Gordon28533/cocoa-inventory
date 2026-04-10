@@ -1,7 +1,9 @@
 import React, { useState } from "react";
+import PropTypes from "prop-types";
+import ConfirmDialog from "./ui/ConfirmDialog.jsx";
+import StateNotice from "./ui/StateNotice.jsx";
 import { useDepartments } from "../Context/DepartmentsContext.js";
 import { api } from "../utils/api.js";
-import PropTypes from "prop-types";
 
 const DepartmentManager = ({ setNotification }) => {
   const { departments, loading, error, refreshDepartments } = useDepartments();
@@ -9,20 +11,29 @@ const DepartmentManager = ({ setNotification }) => {
   const [editDeptId, setEditDeptId] = useState(null);
   const [editDept, setEditDept] = useState({ name: "", description: "" });
   const [saving, setSaving] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState(null);
+  const [localNotice, setLocalNotice] = useState({ message: "", tone: "neutral" });
+  const addDepartmentHelpId = "department-manager-help";
+  const addDepartmentNoticeId = localNotice.message ? "department-manager-notice" : undefined;
+  const addDepartmentDescription = [addDepartmentHelpId, addDepartmentNoticeId].filter(Boolean).join(" ");
 
-  // Departments are now provided by context
+  const showNotice = (message, tone = "neutral") => {
+    setLocalNotice({ message, tone });
+    setNotification && setNotification(message);
+  };
 
-  const handleAdd = async (e) => {
-    e.preventDefault();
+  const handleAdd = async (event) => {
+    event.preventDefault();
     if (!newDept.name.trim()) return;
+
     setSaving(true);
     try {
       await api.createDepartment(newDept);
-      setNotification && setNotification("Department added");
+      showNotice("Department added successfully.", "success");
       setNewDept({ name: "", description: "" });
       refreshDepartments();
     } catch (err) {
-      setNotification && setNotification(err.message || "Server error");
+      showNotice(err.message || "Unable to save the department. Please try again.", "error");
     } finally {
       setSaving(false);
     }
@@ -31,138 +42,202 @@ const DepartmentManager = ({ setNotification }) => {
   const handleEdit = (dept) => {
     setEditDeptId(dept.id);
     setEditDept({ name: dept.name, description: dept.description || "" });
+    setLocalNotice({ message: "", tone: "neutral" });
   };
 
   const handleEditSave = async (id) => {
     if (!editDept.name.trim()) return;
+
     setSaving(true);
     try {
       await api.updateDepartment(id, editDept);
-      setNotification && setNotification("Department updated");
+      showNotice("Department updated successfully.", "success");
       setEditDeptId(null);
       refreshDepartments();
     } catch (err) {
-      setNotification && setNotification(err.message || "Server error");
+      showNotice(err.message || "Unable to update the department. Please try again.", "error");
     } finally {
       setSaving(false);
     }
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this department?")) return;
+  const handleDelete = async () => {
+    if (!pendingDelete) {
+      return;
+    }
+
     setSaving(true);
     try {
-      await api.deleteDepartment(id);
-      setNotification && setNotification("Department deleted");
+      await api.deleteDepartment(pendingDelete.id);
+      showNotice("Department deleted successfully.", "success");
+      setPendingDelete(null);
       refreshDepartments();
     } catch (err) {
-      setNotification && setNotification(err.message || "Server error");
+      showNotice(err.message || "Unable to delete the department. Please try again.", "error");
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <div>
-      <h3>Department Management</h3>
-      <form onSubmit={handleAdd} style={{ display: 'flex', gap: 12, marginBottom: 24, alignItems: 'center' }}>
-        <input
-          type="text"
-          placeholder="Department name"
-          value={newDept.name}
-          onChange={e => setNewDept({ ...newDept, name: e.target.value })}
-          required
-          style={{ padding: 8, borderRadius: 4, border: '1px solid #ccc', minWidth: 180 }}
-        />
-        <input
-          type="text"
-          placeholder="Description (optional)"
-          value={newDept.description}
-          onChange={e => setNewDept({ ...newDept, description: e.target.value })}
-          style={{ padding: 8, borderRadius: 4, border: '1px solid #ccc', minWidth: 220 }}
-        />
+    <div className="feature-panel">
+      <div className="feature-panel__header">
+        <div>
+          <h3>Department Management</h3>
+          <p className="section-subtitle">Add, edit, and retire departments used for routing, approvals, and user assignment.</p>
+        </div>
+      </div>
+
+      {localNotice.message && (
+        <div id="department-manager-notice">
+          <StateNotice tone={localNotice.tone}>{localNotice.message}</StateNotice>
+        </div>
+      )}
+
+      <p id={addDepartmentHelpId} className="field-help">
+        Department names should stay unique so approvals and user assignments stay unambiguous.
+      </p>
+
+      <form onSubmit={handleAdd} className="filter-toolbar" aria-busy={saving} aria-describedby={addDepartmentDescription || undefined}>
+        <label className="toolbar-field department-form__field">
+          <span>Department Name</span>
+          <input
+            type="text"
+            placeholder="Department name"
+            value={newDept.name}
+            onChange={(event) => setNewDept({ ...newDept, name: event.target.value })}
+            required
+            aria-describedby={addDepartmentDescription || undefined}
+          />
+        </label>
+        <label className="toolbar-field department-form__field department-form__field--wide">
+          <span>Description</span>
+          <input
+            type="text"
+            placeholder="Description (optional)"
+            value={newDept.description}
+            onChange={(event) => setNewDept({ ...newDept, description: event.target.value })}
+            aria-describedby={addDepartmentDescription || undefined}
+          />
+        </label>
         <button type="submit" className="btn btn-primary" disabled={saving || !newDept.name.trim()}>
-          {saving ? 'Saving...' : 'Add Department'}
+          {saving && !pendingDelete ? "Saving..." : "Add Department"}
         </button>
       </form>
+
       {loading ? (
-        <div>Loading departments...</div>
+        <StateNotice>Loading departments...</StateNotice>
+      ) : error ? (
+        <StateNotice tone="error">{error}</StateNotice>
+      ) : departments.length === 0 ? (
+        <StateNotice>No departments found.</StateNotice>
       ) : (
-        <table style={{ width: '100%', borderCollapse: 'collapse', background: '#fff' }}>
-          <thead>
-            <tr style={{ background: '#f5f5f5' }}>
-              <th style={{ padding: 10, border: '1px solid #eee', textAlign: 'left' }}>Name</th>
-              <th style={{ padding: 10, border: '1px solid #eee', textAlign: 'left' }}>Description</th>
-              <th style={{ padding: 10, border: '1px solid #eee' }}>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {departments.map(dept => (
-              <tr key={dept.id} style={{ borderBottom: '1px solid #eee' }}>
-                <td style={{ padding: 10 }}>
-                  {editDeptId === dept.id ? (
-                    <input
-                      type="text"
-                      value={editDept.name}
-                      onChange={e => setEditDept({ ...editDept, name: e.target.value })}
-                      required
-                      style={{ padding: 6, borderRadius: 4, border: '1px solid #ccc', minWidth: 120 }}
-                    />
-                  ) : (
-                    dept.name
-                  )}
-                </td>
-                <td style={{ padding: 10 }}>
-                  {editDeptId === dept.id ? (
-                    <input
-                      type="text"
-                      value={editDept.description}
-                      onChange={e => setEditDept({ ...editDept, description: e.target.value })}
-                      style={{ padding: 6, borderRadius: 4, border: '1px solid #ccc', minWidth: 180 }}
-                    />
-                  ) : (
-                    dept.description
-                  )}
-                </td>
-                <td style={{ padding: 10, textAlign: 'center' }}>
-                  {editDeptId === dept.id ? (
-                    <>
-                      <button className="btn btn-primary" style={{ marginRight: 8 }} onClick={() => handleEditSave(dept.id)} disabled={saving || !editDept.name.trim()}>
-                        Save
-                      </button>
-                      <button className="btn btn-secondary" onClick={() => setEditDeptId(null)} disabled={saving}>
-                        Cancel
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <button className="btn btn-secondary" style={{ marginRight: 8 }} onClick={() => handleEdit(dept)} disabled={saving}>
-                        Edit
-                      </button>
-                      <button className="btn btn-danger" onClick={() => handleDelete(dept.id)} disabled={saving}>
-                        Delete
-                      </button>
-                    </>
-                  )}
-                </td>
-              </tr>
-            ))}
-            {departments.length === 0 && (
+        <div className="table-shell">
+          <table className="table-compact table-compact--wide">
+            <caption className="sr-only">
+              Departments currently available for routing, approval workflows, and user assignments.
+            </caption>
+            <thead>
               <tr>
-                <td colSpan={3} style={{ textAlign: 'center', color: '#888', padding: 24 }}>
-                  No departments found.
-                </td>
+                <th scope="col">Name</th>
+                <th scope="col">Description</th>
+                <th scope="col">Actions</th>
               </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {departments.map((dept, index) => (
+                <tr key={dept.id} className={index % 2 === 0 ? "row-alt" : ""}>
+                  <td>
+                    {editDeptId === dept.id ? (
+                      <input
+                        type="text"
+                        value={editDept.name}
+                        onChange={(event) => setEditDept({ ...editDept, name: event.target.value })}
+                        required
+                      />
+                    ) : (
+                      dept.name
+                    )}
+                  </td>
+                  <td>
+                    {editDeptId === dept.id ? (
+                      <input
+                        type="text"
+                        value={editDept.description}
+                        onChange={(event) => setEditDept({ ...editDept, description: event.target.value })}
+                      />
+                    ) : (
+                      dept.description || <span className="muted-text">No description</span>
+                    )}
+                  </td>
+                  <td>
+                    <div className="table-actions">
+                      {editDeptId === dept.id ? (
+                        <>
+                          <button
+                            type="button"
+                            className="btn btn-primary btn-compact"
+                            onClick={() => handleEditSave(dept.id)}
+                            disabled={saving || !editDept.name.trim()}
+                          >
+                            {saving ? "Saving..." : "Save"}
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-secondary btn-compact"
+                            onClick={() => setEditDeptId(null)}
+                            disabled={saving}
+                          >
+                            Cancel
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            type="button"
+                            className="btn btn-secondary btn-compact"
+                            onClick={() => handleEdit(dept)}
+                            disabled={saving}
+                            aria-label={`Edit ${dept.name}`}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-danger btn-compact"
+                            onClick={() => setPendingDelete(dept)}
+                            disabled={saving}
+                            aria-label={`Delete ${dept.name}`}
+                          >
+                            Delete
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {pendingDelete && (
+        <ConfirmDialog
+          title="Delete Department"
+          message={`Delete ${pendingDelete.name}? This can affect users and requisitions linked to the department.`}
+          confirmLabel="Delete Department"
+          isLoading={saving}
+          onConfirm={handleDelete}
+          onCancel={() => setPendingDelete(null)}
+        />
       )}
     </div>
   );
 };
 
 DepartmentManager.propTypes = {
-  setNotification: PropTypes.func,
+  setNotification: PropTypes.func
 };
 
-export default DepartmentManager; 
+export default DepartmentManager;

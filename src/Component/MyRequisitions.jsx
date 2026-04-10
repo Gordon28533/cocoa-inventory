@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import PropTypes from "prop-types";
 import { useDepartments } from "../Context/DepartmentsContext.js";
+import StateNotice from "./ui/StateNotice.jsx";
+import StatusBadge from "./ui/StatusBadge.jsx";
 import { api } from "../utils/api.js";
 import { getBatchStatusMeta } from "../utils/requisitionStatus.js";
 
@@ -190,19 +192,27 @@ const MyRequisitions = ({ inventory }) => {
     }));
   };
 
+  const getAriaSort = (columnKey) => {
+    if (itemSort.key !== columnKey) {
+      return "none";
+    }
+
+    return itemSort.direction === "asc" ? "ascending" : "descending";
+  };
+
   if (loading) {
-    return <div>Loading your requisitions...</div>;
+    return <StateNotice>Loading your requisitions...</StateNotice>;
   }
 
   if (error) {
-    return <div style={{ color: "red" }}>{error}</div>;
+    return <StateNotice tone="error">{error}</StateNotice>;
   }
 
   return (
-    <section style={{ margin: 24 }}>
+    <section className="feature-panel">
       <div className="section-header">
         <div>
-          <h2 style={{ marginBottom: 8 }}>My Requisitions</h2>
+          <h2>My Requisitions</h2>
           <p className="section-subtitle">Track your submitted batches, approval progress, and pickup codes.</p>
         </div>
         <button
@@ -214,7 +224,7 @@ const MyRequisitions = ({ inventory }) => {
         </button>
       </div>
 
-      <div className="toolbar-row toolbar-row--spaced">
+      <div className="filter-toolbar">
         <label className="toolbar-field">
           <span>Search</span>
           <input
@@ -226,7 +236,6 @@ const MyRequisitions = ({ inventory }) => {
             }}
             placeholder="Search batch, item, status, or code"
             aria-label="Search my requisitions"
-            style={{ minWidth: 260 }}
           />
         </label>
 
@@ -239,7 +248,6 @@ const MyRequisitions = ({ inventory }) => {
               setPage(1);
             }}
             aria-label="Filter requisitions by status"
-            style={{ padding: 8, borderRadius: 4, border: "1px solid #ccc", minWidth: 180 }}
           >
             <option value="">All statuses</option>
             {statusOptions.map((status) => (
@@ -259,7 +267,6 @@ const MyRequisitions = ({ inventory }) => {
               setPage(1);
             }}
             aria-label="Rows per page"
-            style={{ padding: 8, borderRadius: 4, border: "1px solid #ccc", minWidth: 120 }}
           >
             {PAGE_SIZES.map((size) => (
               <option key={size} value={size}>
@@ -275,7 +282,7 @@ const MyRequisitions = ({ inventory }) => {
       </div>
 
       {!batchList.length ? (
-        <div>No requisitions matched your current filters.</div>
+        <StateNotice>No requisitions matched your current filters.</StateNotice>
       ) : (
         visibleBatches.map((batch) => {
           const batchStatus = getBatchStatusMeta(batch);
@@ -284,56 +291,72 @@ const MyRequisitions = ({ inventory }) => {
           const sortedBatch = sortBatchItems(batch, inventoryMap, itemSort);
 
           return (
-            <article
-              key={batch[0].batch_id}
-              className="batch-card"
-            >
+            <article key={batch[0].batch_id} className="batch-card">
               <div className="batch-card__header">
-                <strong>Batch ID: {batch[0].batch_id}</strong>
-                <span>Department: {departmentName}</span>
-                <span>Unique Code: {batch[0].unique_code || "Not assigned"}</span>
-                <span>Submitted: {oldestCreatedAt ? new Date(oldestCreatedAt).toLocaleString() : "Unknown"}</span>
-                <span className="batch-card__status" style={{ color: batchStatus.color }}>
-                  {batchStatus.icon} {batchStatus.label}
-                </span>
+                <div className="batch-card__meta">
+                  <div className="batch-card__title-row">
+                    <strong>Batch ID: {batch[0].batch_id}</strong>
+                    <StatusBadge color={batchStatus.color} variant={batchStatus.variant} className="batch-card__status">
+                      <span className="status-badge__icon">{batchStatus.icon}</span>
+                      {batchStatus.label}
+                    </StatusBadge>
+                  </div>
+                  <div className="batch-card__details">
+                    <span>Department: {departmentName}</span>
+                    <span>Unique Code: {batch[0].unique_code || "Not assigned"}</span>
+                    <span>Submitted: {oldestCreatedAt ? new Date(oldestCreatedAt).toLocaleString() : "Unknown"}</span>
+                  </div>
+                </div>
               </div>
 
-              <table className="table-compact">
-                <thead>
-                  <tr>
-                    <th onClick={() => handleSortChange("item")}>
-                      Item
-                    </th>
-                    <th onClick={() => handleSortChange("category")}>
-                      Category
-                    </th>
-                    <th onClick={() => handleSortChange("type")}>
-                      Type
-                    </th>
-                    <th onClick={() => handleSortChange("quantity")}>
-                      Quantity
-                    </th>
-                    <th onClick={() => handleSortChange("status")}>
-                      Status
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {sortedBatch.map((requisition, index) => {
-                    const item = inventoryMap.get(String(requisition.item_id));
+              <div className="table-shell">
+                <table className="table-compact table-compact--wide">
+                  <thead>
+                    <tr>
+                      <th scope="col" aria-sort={getAriaSort("item")}>
+                        <button type="button" className="table-sort-button" onClick={() => handleSortChange("item")}>
+                          Item
+                        </button>
+                      </th>
+                      <th scope="col" aria-sort={getAriaSort("category")}>
+                        <button type="button" className="table-sort-button" onClick={() => handleSortChange("category")}>
+                          Category
+                        </button>
+                      </th>
+                      <th scope="col" aria-sort={getAriaSort("type")}>
+                        <button type="button" className="table-sort-button" onClick={() => handleSortChange("type")}>
+                          Type
+                        </button>
+                      </th>
+                      <th scope="col" aria-sort={getAriaSort("quantity")}>
+                        <button type="button" className="table-sort-button" onClick={() => handleSortChange("quantity")}>
+                          Quantity
+                        </button>
+                      </th>
+                      <th scope="col" aria-sort={getAriaSort("status")}>
+                        <button type="button" className="table-sort-button" onClick={() => handleSortChange("status")}>
+                          Status
+                        </button>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sortedBatch.map((requisition, index) => {
+                      const item = inventoryMap.get(String(requisition.item_id));
 
-                    return (
-                      <tr key={requisition.id} className={index % 2 === 0 ? "row-alt" : ""}>
-                        <td>{item?.name || requisition.item_id}</td>
-                        <td>{item?.category || "-"}</td>
-                        <td>{item?.type || "-"}</td>
-                        <td>{requisition.quantity}</td>
-                        <td>{requisition.status}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                      return (
+                        <tr key={requisition.id} className={index % 2 === 0 ? "row-alt" : ""}>
+                          <td>{item?.name || requisition.item_id}</td>
+                          <td>{item?.category || "-"}</td>
+                          <td>{item?.type || "-"}</td>
+                          <td>{requisition.quantity}</td>
+                          <td>{requisition.status}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
 
               <div className="batch-card__footer">
                 <button className="btn btn-secondary" onClick={() => exportBatchToCsv(batch, inventoryMap)}>
@@ -346,7 +369,7 @@ const MyRequisitions = ({ inventory }) => {
       )}
 
       {totalPages > 1 && (
-        <div className="toolbar-row" style={{ justifyContent: "center", marginTop: 24 }}>
+        <div className="table-pagination">
           <button className="btn btn-secondary" onClick={() => setPage(1)} disabled={currentPage === 1}>
             First
           </button>
@@ -357,7 +380,7 @@ const MyRequisitions = ({ inventory }) => {
           >
             Previous
           </button>
-          <span>
+          <span className="table-pagination__label">
             Page {currentPage} of {totalPages}
           </span>
           <button

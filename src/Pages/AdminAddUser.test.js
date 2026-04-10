@@ -113,6 +113,24 @@ describe("AdminAddUser", () => {
     });
     expect(screen.getByText(/Grace Admin/i)).toBeInTheDocument();
     expect(screen.getByText(/Kojo Stores/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Edit Grace Admin/i })).toBeInTheDocument();
+  });
+
+  it("marks the admin password field invalid when confirmation fails", async () => {
+    api.login.mockRejectedValue(new Error("Invalid admin password."));
+
+    renderPage();
+
+    const passwordInput = screen.getByLabelText(/Admin Password/i);
+
+    fireEvent.change(passwordInput, {
+      target: { value: "wrong-password" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Confirm/i }));
+
+    expect(await screen.findByText(/Invalid admin password\./i)).toBeInTheDocument();
+    expect(passwordInput).toHaveAttribute("aria-invalid", "true");
+    expect(passwordInput).toHaveAttribute("aria-describedby", expect.stringContaining("admin-password-help"));
   });
 
   it("creates a user and refreshes the user list", async () => {
@@ -155,7 +173,7 @@ describe("AdminAddUser", () => {
 
     await unlockAdmin();
 
-    fireEvent.click(screen.getAllByRole("button", { name: /Edit/i })[0]);
+    fireEvent.click(screen.getByRole("button", { name: /Edit Grace Admin/i }));
 
     expect(screen.getByText(/Edit User/i)).toBeInTheDocument();
 

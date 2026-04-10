@@ -1,11 +1,14 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import AuditLogViewer from "../Component/AuditLogViewer.jsx";
+import ConfirmDialog from "../Component/ui/ConfirmDialog.jsx";
 import DepartmentManager from "../Component/DepartmentManager.jsx";
 import ModalCard from "../Component/ui/ModalCard.jsx";
 import StateNotice from "../Component/ui/StateNotice.jsx";
+import StatusBadge from "../Component/ui/StatusBadge.jsx";
 import { useAuth } from "../Context/AuthContext.js";
 import { useDepartments } from "../Context/DepartmentsContext.js";
+import useDocumentTitle from "../hooks/useDocumentTitle.js";
 import { api } from "../utils/api.js";
 
 const ROLE_OPTIONS = [
@@ -59,9 +62,12 @@ const AdminAddUser = () => {
   const [passwordPrompt, setPasswordPrompt] = useState(true);
   const [passwordInput, setPasswordInput] = useState("");
   const [passwordError, setPasswordError] = useState("");
+  const [passwordChecking, setPasswordChecking] = useState(false);
 
   const [editUser, setEditUser] = useState(null);
   const [editForm, setEditForm] = useState(EMPTY_EDIT_FORM);
+  const [savingUser, setSavingUser] = useState(false);
+  const [confirmAction, setConfirmAction] = useState(null);
 
   const [showAudit, setShowAudit] = useState(false);
   const [showDepartments, setShowDepartments] = useState(false);
@@ -71,9 +77,21 @@ const AdminAddUser = () => {
   const [changePwConfirm, setChangePwConfirm] = useState("");
   const [changePwMsg, setChangePwMsg] = useState("");
   const [changePwLoading, setChangePwLoading] = useState(false);
+  const adminPasswordHelpId = "admin-password-help";
+  const adminPasswordErrorId = passwordError ? "admin-password-error" : undefined;
+  const adminPasswordDescription = [adminPasswordHelpId, adminPasswordErrorId].filter(Boolean).join(" ");
+  const createUserHelpId = "admin-create-user-help";
+  const createUserMessageId = message && !editUser ? "admin-create-user-message" : undefined;
+  const createUserDescription = [createUserHelpId, createUserMessageId].filter(Boolean).join(" ");
+  const changePasswordHelpId = "admin-change-password-help";
+  const changePasswordMessageId = changePwMsg ? "admin-change-password-message" : undefined;
+  const changePasswordDescription = [changePasswordHelpId, changePasswordMessageId].filter(Boolean).join(" ");
+  const changePasswordMismatch = Boolean(changePwConfirm) && changePwConfirm !== changePwNew;
 
   const messageTone = useMemo(() => getMessageTone(message), [message]);
   const changePasswordTone = useMemo(() => getMessageTone(changePwMsg), [changePwMsg]);
+
+  useDocumentTitle("User Management");
 
   useEffect(() => {
     if (userRole && userRole !== "admin") {
@@ -110,6 +128,10 @@ const AdminAddUser = () => {
   };
 
   const closeEditModal = () => {
+    if (savingUser) {
+      return;
+    }
+
     setEditUser(null);
     setEditForm(EMPTY_EDIT_FORM);
     setMessage("");
@@ -130,6 +152,7 @@ const AdminAddUser = () => {
   const handlePasswordSubmit = async (event) => {
     event.preventDefault();
     setPasswordError("");
+    setPasswordChecking(true);
 
     try {
       const data = await api.login({ staffName: adminName, password: passwordInput });
@@ -140,12 +163,15 @@ const AdminAddUser = () => {
       }
     } catch (error) {
       setPasswordError(error.message || "Network error. Please try again.");
+    } finally {
+      setPasswordChecking(false);
     }
   };
 
   const handleCreateUser = async (event) => {
     event.preventDefault();
     setMessage("");
+    setSavingUser(true);
 
     try {
       const data = await api.createUser({
@@ -163,46 +189,45 @@ const AdminAddUser = () => {
       }
     } catch (error) {
       setMessage(error.message || "Failed to add user.");
+    } finally {
+      setSavingUser(false);
     }
   };
 
-  const handleDeleteUser = async (userId) => {
-    if (!window.confirm("Are you sure you want to delete this user?")) {
+  const handleConfirmAction = async () => {
+    if (!confirmAction) {
       return;
     }
 
+    setSavingUser(true);
+
     try {
-      const data = await api.deleteUser(userId);
+      const request =
+        confirmAction.type === "delete"
+          ? api.deleteUser(confirmAction.user.id)
+          : api.deactivateUser(confirmAction.user.id);
+
+      const data = await request;
 
       if (data.success) {
-        setMessage("User deleted successfully!");
+        setMessage(confirmAction.type === "delete" ? "User deleted successfully!" : "User deactivated successfully!");
+        setConfirmAction(null);
         await fetchUsers();
       }
     } catch (error) {
-      setMessage(error.message || "Failed to delete user.");
-    }
-  };
-
-  const handleDeactivateUser = async (userId) => {
-    if (!window.confirm("Are you sure you want to deactivate this user?")) {
-      return;
-    }
-
-    try {
-      const data = await api.deactivateUser(userId);
-
-      if (data.success) {
-        setMessage("User deactivated successfully!");
-        await fetchUsers();
-      }
-    } catch (error) {
-      setMessage(error.message || "Failed to deactivate user.");
+      setMessage(
+        error.message ||
+          (confirmAction.type === "delete" ? "Failed to delete user." : "Failed to deactivate user.")
+      );
+    } finally {
+      setSavingUser(false);
     }
   };
 
   const handleEditSubmit = async (event) => {
     event.preventDefault();
     setMessage("");
+    setSavingUser(true);
 
     const requestBody = {
       staffName: editForm.staffName,
@@ -220,11 +245,14 @@ const AdminAddUser = () => {
 
       if (data.success) {
         setMessage("User updated successfully!");
-        closeEditModal();
+        setEditUser(null);
+        setEditForm(EMPTY_EDIT_FORM);
         await fetchUsers();
       }
     } catch (error) {
       setMessage(error.message || "Failed to update user.");
+    } finally {
+      setSavingUser(false);
     }
   };
 
@@ -262,21 +290,36 @@ const AdminAddUser = () => {
 
   if (passwordPrompt) {
     return (
-      <div style={{ maxWidth: 420, margin: "80px auto" }}>
-        <div className="form-container">
-          <h2 style={{ marginBottom: 16 }}>Admin Password Required</h2>
-          <form onSubmit={handlePasswordSubmit}>
-            <input
-              type="password"
-              placeholder="Enter your admin password"
-              value={passwordInput}
-              onChange={(event) => setPasswordInput(event.target.value)}
-              required
-              style={{ width: "100%", padding: 12, marginBottom: 16, borderRadius: 6, border: "1px solid #ccc" }}
-            />
-            {passwordError && <StateNotice tone="error">{passwordError}</StateNotice>}
-            <button type="submit" className="btn btn-primary" style={{ marginTop: 12 }}>
-              Confirm
+      <div className="admin-security-shell">
+        <div className="form-container admin-security-card">
+          <h2>Admin Password Required</h2>
+          <p className="section-subtitle">Confirm your password before opening staff administration tools.</p>
+          <form onSubmit={handlePasswordSubmit} className="admin-security-form" aria-busy={passwordChecking}>
+            <label className="form-group" htmlFor="adminPassword">
+              <span>Admin Password</span>
+              <input
+                id="adminPassword"
+                name="adminPassword"
+                type="password"
+                placeholder="Enter your admin password"
+                value={passwordInput}
+                onChange={(event) => setPasswordInput(event.target.value)}
+                required
+                autoComplete="current-password"
+                aria-describedby={adminPasswordDescription || undefined}
+                aria-invalid={Boolean(passwordError)}
+              />
+            </label>
+            <p id={adminPasswordHelpId} className="field-help">
+              Re-enter your password to unlock staff management and audit controls.
+            </p>
+            {passwordError && (
+              <div id="admin-password-error">
+                <StateNotice tone="error">{passwordError}</StateNotice>
+              </div>
+            )}
+            <button type="submit" className="btn btn-primary" disabled={passwordChecking || !passwordInput.trim()}>
+              {passwordChecking ? "Checking..." : "Confirm"}
             </button>
           </form>
         </div>
@@ -285,192 +328,81 @@ const AdminAddUser = () => {
   }
 
   return (
-    <div className="admin-add-user">
-      <div className="section-header">
+    <div className="admin-add-user feature-panel">
+      <div className="feature-panel__header">
         <div>
-          <h2 style={{ marginBottom: 8 }}>User Management</h2>
-          <p className="section-subtitle">Create staff accounts, manage roles, and maintain approval access.</p>
+          <h2>User Management</h2>
+          <p className="section-subtitle">Create staff accounts, manage approval roles, and keep branch setup complete.</p>
         </div>
       </div>
 
-      <StateNotice>
-        <strong>Branch Setup Guidance:</strong>
-        <ul style={{ margin: "8px 0 0 18px", padding: 0 }}>
+      <div className="admin-guidance-card">
+        <h3>Branch Setup Guidance</h3>
+        <ul className="admin-guidance-list">
           <li>Ensure departments exist for each branch: Tema Takeover Center, Kumasi Takeover Center, Takoradi Takeover Center, and Head Office.</li>
           <li>For each branch, add at least one user with role `stores` and one with role `account`.</li>
           <li>For Head Office, add users with roles `account_manager` and `stores` for final approvals and fulfillment.</li>
         </ul>
-        <div style={{ marginTop: 8, color: "#1976d2" }}>
-          This setup enables the multi-step branch requisition approval workflow.
-        </div>
-      </StateNotice>
-
-      <div className="form-container" style={{ marginTop: 24 }}>
-        <h3>Add User</h3>
-        <form onSubmit={handleCreateUser} className="toolbar-row">
-          <input
-            id="staffName"
-            name="staffName"
-            type="text"
-            placeholder="Staff Name"
-            value={staffName}
-            onChange={(event) => setStaffName(event.target.value)}
-            required
-            autoComplete="name"
-          />
-          <input
-            id="staffId"
-            name="staffId"
-            type="text"
-            placeholder="Staff ID"
-            value={staffId}
-            onChange={(event) => setStaffId(event.target.value)}
-            required
-            autoComplete="off"
-          />
-          <select id="role" name="role" value={role} onChange={(event) => setRole(event.target.value)} required>
-            {ROLE_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-          <select
-            id="departmentId"
-            name="departmentId"
-            value={departmentId}
-            onChange={(event) => setDepartmentId(event.target.value)}
-            required
-          >
-            <option value="">Select Department</option>
-            {departments.map((department) => (
-              <option key={department.id} value={department.id}>
-                {department.name}
-              </option>
-            ))}
-          </select>
-          <input
-            id="password"
-            name="password"
-            type="password"
-            placeholder="Password (leave blank for default)"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            autoComplete="new-password"
-          />
-          <button type="submit" className="btn btn-primary">
-            Add User
-          </button>
-        </form>
+        <p className="admin-guidance-note">This setup enables the multi-step branch requisition approval workflow.</p>
       </div>
 
-      {message && !editUser && (
-        <div style={{ marginBottom: 24 }}>
-          <StateNotice tone={messageTone}>{message}</StateNotice>
+      <section className="feature-card">
+        <div className="feature-card__header">
+          <div>
+            <h3>Add User</h3>
+            <p className="section-subtitle">Create new staff accounts and assign the right role and department from the start.</p>
+          </div>
         </div>
-      )}
+        <p id={createUserHelpId} className="field-help">
+          All new users need a role and department so routing, approvals, and inventory access work correctly.
+        </p>
 
-      <div className="section-header" style={{ marginBottom: 16 }}>
-        <h3 style={{ margin: 0 }}>All Users</h3>
-      </div>
-
-      {loading ? (
-        <StateNotice>Loading users...</StateNotice>
-      ) : users.length === 0 ? (
-        <StateNotice>No users found.</StateNotice>
-      ) : (
-        <table style={{ width: "100%", borderCollapse: "collapse" }}>
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Staff ID</th>
-              <th>Role</th>
-              <th>Status</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {users.map((user) => (
-              <tr key={user.id}>
-                <td>{user.staffName}</td>
-                <td>{user.staffId}</td>
-                <td>{user.role}</td>
-                <td>
-                  <StateNotice tone={user.isActive ? "success" : "error"}>
-                    {user.isActive ? "Active" : "Inactive"}
-                  </StateNotice>
-                </td>
-                <td>
-                  <div className="dashboard-actions">
-                    <button className="btn btn-secondary" onClick={() => openEditModal(user)}>
-                      Edit
-                    </button>
-                    {user.isActive ? (
-                      <button className="btn btn-secondary" onClick={() => handleDeactivateUser(user.id)}>
-                        Deactivate
-                      </button>
-                    ) : (
-                      <span style={{ color: "#6c757d" }}>Deactivated</span>
-                    )}
-                    <button className="btn btn-danger" onClick={() => handleDeleteUser(user.id)}>
-                      Delete
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-
-      {editUser && (
-        <ModalCard title="Edit User">
-          <form onSubmit={handleEditSubmit}>
-            <label htmlFor="editStaffName">Staff Name</label>
+        <form onSubmit={handleCreateUser} className="admin-user-form" aria-busy={savingUser} aria-describedby={createUserDescription || undefined}>
+          <label className="toolbar-field">
+            <span>Create Account Name</span>
             <input
-              id="editStaffName"
-              name="editStaffName"
+              id="staffName"
+              name="staffName"
               type="text"
-              value={editForm.staffName}
-              onChange={(event) => setEditForm((current) => ({ ...current, staffName: event.target.value }))}
+              placeholder="Staff Name"
+              value={staffName}
+              onChange={(event) => setStaffName(event.target.value)}
               required
-              style={{ display: "block", marginBottom: 12, width: "100%" }}
+              autoComplete="name"
             />
-
-            <label htmlFor="editStaffId">Staff ID</label>
+          </label>
+          <label className="toolbar-field">
+            <span>Create Account ID</span>
             <input
-              id="editStaffId"
-              name="editStaffId"
+              id="staffId"
+              name="staffId"
               type="text"
-              value={editForm.staffId}
-              onChange={(event) => setEditForm((current) => ({ ...current, staffId: event.target.value }))}
+              placeholder="Staff ID"
+              value={staffId}
+              onChange={(event) => setStaffId(event.target.value)}
               required
-              style={{ display: "block", marginBottom: 12, width: "100%" }}
+              autoComplete="off"
             />
-
-            <label htmlFor="editRole">Role</label>
-            <select
-              id="editRole"
-              name="editRole"
-              value={editForm.role}
-              onChange={(event) => setEditForm((current) => ({ ...current, role: event.target.value }))}
-              style={{ display: "block", marginBottom: 12, width: "100%", minHeight: 40 }}
-            >
+          </label>
+          <label className="toolbar-field">
+            <span>Role Assignment</span>
+            <select id="role" name="role" value={role} onChange={(event) => setRole(event.target.value)} required>
               {ROLE_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>
                   {option.label}
                 </option>
               ))}
             </select>
-
-            <label htmlFor="editDepartmentId">Department</label>
+          </label>
+          <label className="toolbar-field">
+            <span>Department Assignment</span>
             <select
-              id="editDepartmentId"
-              name="editDepartmentId"
-              value={editForm.departmentId}
-              onChange={(event) => setEditForm((current) => ({ ...current, departmentId: event.target.value }))}
-              style={{ display: "block", marginBottom: 12, width: "100%", minHeight: 40 }}
+              id="departmentId"
+              name="departmentId"
+              value={departmentId}
+              onChange={(event) => setDepartmentId(event.target.value)}
               required
+              aria-describedby={createUserDescription || undefined}
             >
               <option value="">Select Department</option>
               {departments.map((department) => (
@@ -479,90 +411,315 @@ const AdminAddUser = () => {
                 </option>
               ))}
             </select>
-
-            <label htmlFor="editPassword">Set new password (optional)</label>
+          </label>
+          <label className="toolbar-field">
+            <span>Initial Password</span>
             <input
-              id="editPassword"
-              name="editPassword"
+              id="password"
+              name="password"
               type="password"
-              placeholder="Set new password (optional)"
-              value={editForm.password}
-              onChange={(event) => setEditForm((current) => ({ ...current, password: event.target.value }))}
-              style={{ display: "block", marginBottom: 12, width: "100%" }}
+              placeholder="Password (leave blank for default)"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              autoComplete="new-password"
+              aria-describedby={createUserDescription || undefined}
             />
+          </label>
+          <div className="admin-user-form__actions">
+            <button type="submit" className="btn btn-primary" disabled={savingUser}>
+              {savingUser ? "Saving..." : "Add User"}
+            </button>
+          </div>
+        </form>
+      </section>
+
+      {message && !editUser && (
+        <div id="admin-create-user-message">
+          <StateNotice tone={messageTone}>{message}</StateNotice>
+        </div>
+      )}
+
+      <section className="feature-card">
+        <div className="feature-card__header">
+          <div>
+            <h3>All Users</h3>
+            <p className="section-subtitle">Review access across the organization and deactivate stale accounts when needed.</p>
+          </div>
+        </div>
+
+        {loading ? (
+          <StateNotice>Loading users...</StateNotice>
+        ) : users.length === 0 ? (
+          <StateNotice>No users found.</StateNotice>
+        ) : (
+          <div className="admin-users-table">
+            <table>
+              <caption className="sr-only">
+                Staff accounts with their current roles, status, and available management actions.
+              </caption>
+              <thead>
+                <tr>
+                  <th scope="col">Name</th>
+                  <th scope="col">Staff ID</th>
+                  <th scope="col">Role</th>
+                  <th scope="col">Status</th>
+                  <th scope="col">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {users.map((user) => (
+                  <tr key={user.id}>
+                    <td>{user.staffName}</td>
+                    <td>{user.staffId}</td>
+                    <td>{user.role}</td>
+                    <td>
+                      <StatusBadge
+                        label={user.isActive ? "Active" : "Inactive"}
+                        variant={user.isActive ? "success" : "danger"}
+                      />
+                    </td>
+                    <td>
+                      <div className="table-actions">
+                        <button
+                          type="button"
+                          className="btn btn-secondary btn-compact"
+                          onClick={() => openEditModal(user)}
+                          disabled={savingUser}
+                          aria-label={`Edit ${user.staffName}`}
+                        >
+                          Edit
+                        </button>
+                        {user.isActive ? (
+                          <button
+                            type="button"
+                            className="btn btn-secondary btn-compact"
+                            onClick={() => setConfirmAction({ type: "deactivate", user })}
+                            disabled={savingUser}
+                            aria-label={`Deactivate ${user.staffName}`}
+                          >
+                            Deactivate
+                          </button>
+                        ) : (
+                          <span className="muted-text">Deactivated</span>
+                        )}
+                        <button
+                          type="button"
+                          className="btn btn-danger btn-compact"
+                          onClick={() => setConfirmAction({ type: "delete", user })}
+                          disabled={savingUser}
+                          aria-label={`Delete ${user.staffName}`}
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      {editUser && (
+        <ModalCard title="Edit User" onClose={closeEditModal}>
+          <form onSubmit={handleEditSubmit} className="inventory-modal-form" aria-busy={savingUser}>
+            <label className="form-group" htmlFor="editStaffName">
+              <span>Staff Name</span>
+              <input
+                id="editStaffName"
+                name="editStaffName"
+                type="text"
+                value={editForm.staffName}
+                onChange={(event) => setEditForm((current) => ({ ...current, staffName: event.target.value }))}
+                required
+              />
+            </label>
+
+            <label className="form-group" htmlFor="editStaffId">
+              <span>Staff ID</span>
+              <input
+                id="editStaffId"
+                name="editStaffId"
+                type="text"
+                value={editForm.staffId}
+                onChange={(event) => setEditForm((current) => ({ ...current, staffId: event.target.value }))}
+                required
+              />
+            </label>
+
+            <label className="form-group" htmlFor="editRole">
+              <span>Role</span>
+              <select
+                id="editRole"
+                name="editRole"
+                value={editForm.role}
+                onChange={(event) => setEditForm((current) => ({ ...current, role: event.target.value }))}
+              >
+                {ROLE_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="form-group" htmlFor="editDepartmentId">
+              <span>Department</span>
+              <select
+                id="editDepartmentId"
+                name="editDepartmentId"
+                value={editForm.departmentId}
+                onChange={(event) => setEditForm((current) => ({ ...current, departmentId: event.target.value }))}
+                required
+              >
+                <option value="">Select Department</option>
+                {departments.map((department) => (
+                  <option key={department.id} value={department.id}>
+                    {department.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="form-group" htmlFor="editPassword">
+              <span>Set new password (optional)</span>
+              <input
+                id="editPassword"
+                name="editPassword"
+                type="password"
+                placeholder="Set new password (optional)"
+                value={editForm.password}
+                onChange={(event) => setEditForm((current) => ({ ...current, password: event.target.value }))}
+              />
+            </label>
 
             {message && <StateNotice tone="error">{message}</StateNotice>}
 
-            <div className="dashboard-actions" style={{ justifyContent: "flex-end", marginTop: 16 }}>
-              <button type="button" onClick={closeEditModal} className="btn btn-secondary">
+            <div className="modal-actions">
+              <button type="button" onClick={closeEditModal} className="btn btn-secondary" disabled={savingUser}>
                 Cancel
               </button>
-              <button type="submit" className="btn btn-primary">
-                Save
+              <button type="submit" className="btn btn-primary" disabled={savingUser}>
+                {savingUser ? "Saving..." : "Save"}
               </button>
             </div>
           </form>
         </ModalCard>
       )}
 
-      <div className="dashboard-actions" style={{ marginTop: 40 }}>
-        <button onClick={() => setShowAudit((current) => !current)} className="btn btn-success">
-          Audit Logs
+      {confirmAction && (
+        <ConfirmDialog
+          title={confirmAction.type === "delete" ? "Delete User" : "Deactivate User"}
+          message={
+            confirmAction.type === "delete"
+              ? `Delete ${confirmAction.user.staffName}? This action cannot be undone.`
+              : `Deactivate ${confirmAction.user.staffName}? They will lose access until reactivated.`
+          }
+          confirmLabel={confirmAction.type === "delete" ? "Delete User" : "Deactivate User"}
+          isLoading={savingUser}
+          onConfirm={handleConfirmAction}
+          onCancel={() => setConfirmAction(null)}
+        />
+      )}
+
+      <div className="admin-toggle-row">
+        <button type="button" onClick={() => setShowAudit((current) => !current)} className="btn btn-success">
+          {showAudit ? "Hide Audit Logs" : "Audit Logs"}
         </button>
-        <button onClick={() => setShowDepartments((current) => !current)} className="btn btn-secondary">
-          Department Management
+        <button type="button" onClick={() => setShowDepartments((current) => !current)} className="btn btn-secondary">
+          {showDepartments ? "Hide Department Management" : "Department Management"}
         </button>
       </div>
 
       {showAudit && (
-        <div style={{ margin: "32px 0" }}>
+        <section className="feature-card">
+          <div className="feature-card__header">
+            <div>
+              <h3>Audit Logs</h3>
+              <p className="section-subtitle">Inspect notable system activity and recent account actions.</p>
+            </div>
+          </div>
           <AuditLogViewer />
-        </div>
+        </section>
       )}
 
       {showDepartments && (
-        <div style={{ margin: "32px 0" }}>
+        <section className="feature-card">
+          <div className="feature-card__header">
+            <div>
+              <h3>Department Management</h3>
+              <p className="section-subtitle">Maintain the department list used by routing, approvals, and user assignments.</p>
+            </div>
+          </div>
           <DepartmentManager />
-        </div>
+        </section>
       )}
 
-      <div className="form-container" style={{ marginTop: 48, maxWidth: 440 }}>
-        <h3>Change My Password</h3>
-        <form onSubmit={handleChangePassword}>
-          <input
-            type="password"
-            placeholder="Current password"
-            value={changePwOld}
-            onChange={(event) => setChangePwOld(event.target.value)}
-            style={{ display: "block", marginBottom: 10, width: "100%" }}
-            required
-          />
-          <input
-            type="password"
-            placeholder="New password"
-            value={changePwNew}
-            onChange={(event) => setChangePwNew(event.target.value)}
-            style={{ display: "block", marginBottom: 10, width: "100%" }}
-            required
-          />
-          <input
-            type="password"
-            placeholder="Confirm new password"
-            value={changePwConfirm}
-            onChange={(event) => setChangePwConfirm(event.target.value)}
-            style={{ display: "block", marginBottom: 14, width: "100%" }}
-            required
-          />
-          <button type="submit" disabled={changePwLoading} className="btn btn-primary" style={{ width: "100%" }}>
+      <section className="feature-card admin-password-card">
+        <div className="feature-card__header">
+          <div>
+            <h3>Change My Password</h3>
+            <p className="section-subtitle">Keep your own admin access secure without leaving the management workspace.</p>
+          </div>
+        </div>
+        <p id={changePasswordHelpId} className="field-help">
+          Use your current password to confirm the change before setting a new one.
+        </p>
+        <form onSubmit={handleChangePassword} className="inventory-modal-form" aria-describedby={changePasswordDescription || undefined}>
+          <label className="form-group" htmlFor="adminChangePwOld">
+            <span>Current Password</span>
+            <input
+              id="adminChangePwOld"
+              name="adminChangePwOld"
+              type="password"
+              placeholder="Current password"
+              value={changePwOld}
+              onChange={(event) => setChangePwOld(event.target.value)}
+              required
+              autoComplete="current-password"
+              aria-describedby={changePasswordDescription || undefined}
+            />
+          </label>
+          <label className="form-group" htmlFor="adminChangePwNew">
+            <span>New Password</span>
+            <input
+              id="adminChangePwNew"
+              name="adminChangePwNew"
+              type="password"
+              placeholder="New password"
+              value={changePwNew}
+              onChange={(event) => setChangePwNew(event.target.value)}
+              required
+              autoComplete="new-password"
+              aria-describedby={changePasswordDescription || undefined}
+            />
+          </label>
+          <label className="form-group" htmlFor="adminChangePwConfirm">
+            <span>Confirm New Password</span>
+            <input
+              id="adminChangePwConfirm"
+              name="adminChangePwConfirm"
+              type="password"
+              placeholder="Confirm new password"
+              value={changePwConfirm}
+              onChange={(event) => setChangePwConfirm(event.target.value)}
+              required
+              autoComplete="new-password"
+              aria-describedby={changePasswordDescription || undefined}
+              aria-invalid={changePasswordMismatch}
+            />
+          </label>
+          <button type="submit" disabled={changePwLoading} className="btn btn-primary admin-password-card__submit">
             {changePwLoading ? "Changing..." : "Change Password"}
           </button>
           {changePwMsg && (
-            <div style={{ marginTop: 10 }}>
+            <div id="admin-change-password-message">
               <StateNotice tone={changePasswordTone}>{changePwMsg}</StateNotice>
             </div>
           )}
         </form>
-      </div>
+      </section>
     </div>
   );
 };

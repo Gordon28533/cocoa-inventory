@@ -157,14 +157,14 @@ const RequisitionFulfill = ({ setNotification, inventory }) => {
       });
 
       if (data.success) {
-        showFeedback("Batch fulfilled!");
+        showFeedback("Batch fulfilled successfully.");
         setReadyBatches((current) => current.filter((group) => group[0].batch_id !== batchId));
         setBatch(null);
         setCode("");
         setReceiverId("");
       }
     } catch (error) {
-      showFeedback(error.message || "Fulfillment failed.");
+      showFeedback(error.message || "Unable to fulfill the batch. Please try again.");
     }
   };
 
@@ -198,168 +198,233 @@ const RequisitionFulfill = ({ setNotification, inventory }) => {
   const selectedBatchReady = batch?.length ? readyBatchIds.has(batch[0].batch_id) : false;
 
   return (
-    <div>
-      <h2>Fulfill Requisition</h2>
-
-      <div style={{ marginBottom: 16 }}>
-        <h4 style={{ marginBottom: 8 }}>Batches requested (awaiting approvals)</h4>
-        {isLoading ? (
-          <StateNotice>Loading...</StateNotice>
-        ) : requestedBatches.length === 0 ? (
-          <StateNotice>No requested batches awaiting approval.</StateNotice>
-        ) : (
-          <table style={{ width: "100%", marginBottom: 12 }}>
-            <thead>
-              <tr>
-                <th style={{ textAlign: "left" }}>Batch ID</th>
-                <th style={{ textAlign: "left" }}>Department</th>
-                <th>Items</th>
-                <th>Status</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {requestedBatches.map((currentBatch) => {
-                const batchStatus = getBatchStatusMeta(currentBatch);
-                return (
-                  <tr key={currentBatch[0].batch_id}>
-                    <td>{currentBatch[0].batch_id}</td>
-                    <td>{currentBatch[0].department}</td>
-                    <td style={{ textAlign: "center" }}>{currentBatch.length}</td>
-                    <td>
-                      <StatusBadge color={batchStatus.color} label={batchStatus.label} />
-                    </td>
-                    <td>
-                      <button className="btn btn-secondary" onClick={() => handleOpenBatch(currentBatch[0].batch_id)}>
-                        Open
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
+    <div className="feature-panel">
+      <div className="feature-panel__header">
+        <div>
+          <h2>Fulfill Requisition</h2>
+          <p className="section-subtitle">
+            Track batches still awaiting approval, open ready batches, and verify pickup details before fulfillment.
+          </p>
+        </div>
       </div>
 
-      <div style={{ marginBottom: 16 }}>
-        <h4 style={{ marginBottom: 8 }}>Batches ready to fulfill</h4>
-        {isLoading ? (
-          <StateNotice>Loading...</StateNotice>
-        ) : readyBatches.length === 0 ? (
-          <StateNotice>No batches are currently ready.</StateNotice>
-        ) : (
-          <table style={{ width: "100%", marginBottom: 12 }}>
-            <thead>
-              <tr>
-                <th style={{ textAlign: "left" }}>Batch ID</th>
-                <th style={{ textAlign: "left" }}>Department</th>
-                <th>Items</th>
-                <th>Status</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {readyBatches.map((currentBatch) => {
-                const batchStatus = getBatchStatusMeta(currentBatch);
-                return (
-                  <tr key={currentBatch[0].batch_id}>
-                    <td>{currentBatch[0].batch_id}</td>
-                    <td>{currentBatch[0].department}</td>
-                    <td style={{ textAlign: "center" }}>{currentBatch.length}</td>
-                    <td>
-                      <StatusBadge color={batchStatus.color} label={batchStatus.label} />
-                    </td>
-                    <td>
-                      <button className="btn btn-secondary" onClick={() => handleOpenBatch(currentBatch[0].batch_id)}>
-                        Open
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
-      </div>
-
-      <div style={{ marginBottom: 16 }}>
-        <label htmlFor="lookup-code" style={{ marginRight: 8 }}>
-          Unique Code:
-        </label>
-        <input
-          id="lookup-code"
-          value={code}
-          onChange={(event) => setCode(event.target.value)}
-          placeholder="Enter unique code"
-        />
-        <button type="button" onClick={handleLookup} style={{ marginLeft: 8 }}>
-          Lookup
-        </button>
-      </div>
-
-      {batch && batch.length > 0 && (
-        <div style={{ marginTop: 16 }}>
-          <div className="batch-card__header" style={{ marginBottom: 8, background: "#fff", borderBottom: "none", padding: 0 }}>
-            Batch ID: {batch[0].batch_id} | Department: {batch[0].department} | IT Item: {batch[0].is_it_item ? "Yes" : "No"}
-            <StatusBadge color={getBatchStatusMeta(batch).color} className="batch-card__status">
-              <span style={{ fontSize: 14 }}>{getBatchStatusMeta(batch).icon}</span>
-              {getBatchStatusMeta(batch).label}
-            </StatusBadge>
+      <div className="feature-grid feature-grid--2">
+        <section className="feature-card">
+          <div className="feature-card__header">
+            <div>
+              <h3>Batches requested</h3>
+              <p className="section-subtitle">These batches are still moving through the approval chain.</p>
+            </div>
           </div>
+          {isLoading ? (
+            <StateNotice>Loading batches still moving through approvals...</StateNotice>
+          ) : requestedBatches.length === 0 ? (
+            <StateNotice>No requested batches awaiting approval.</StateNotice>
+          ) : (
+            <table className="table-compact">
+              <caption className="sr-only">Batches that are still moving through the approval process.</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Batch ID</th>
+                  <th scope="col">Department</th>
+                  <th scope="col">Items</th>
+                  <th scope="col">Status</th>
+                  <th scope="col">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {requestedBatches.map((currentBatch, index) => {
+                  const batchStatus = getBatchStatusMeta(currentBatch);
+                  return (
+                    <tr key={currentBatch[0].batch_id} className={index % 2 === 0 ? "row-alt" : ""}>
+                      <td>{currentBatch[0].batch_id}</td>
+                      <td>{currentBatch[0].department}</td>
+                      <td>{currentBatch.length}</td>
+                      <td>
+                        <StatusBadge color={batchStatus.color} variant={batchStatus.variant} label={batchStatus.label} />
+                      </td>
+                      <td>
+                        <button
+                          className="btn btn-secondary btn-compact"
+                          onClick={() => handleOpenBatch(currentBatch[0].batch_id)}
+                          aria-label={`Open requested batch ${currentBatch[0].batch_id}`}
+                        >
+                          Open
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </section>
 
-          <table style={{ width: "100%", marginBottom: 12 }}>
-            <thead>
-              <tr>
-                <th>Item</th>
-                <th>Category</th>
-                <th>Type</th>
-                <th>Quantity</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {batch.map((item, index) => {
-                const details = getItemDetails(item.item_id);
-                return (
-                  <tr key={item.id} style={{ background: index % 2 === 0 ? "#f4f6fa" : "#fff" }}>
-                    <td>{details.name}</td>
-                    <td>{details.category}</td>
-                    <td>{details.type}</td>
-                    <td>{item.quantity}</td>
-                    <td title={`Status: ${item.status}`}>{item.status}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+        <section className="feature-card">
+          <div className="feature-card__header">
+            <div>
+              <h3>Batches ready to fulfill</h3>
+              <p className="section-subtitle">These batches are approved and ready for code verification.</p>
+            </div>
+          </div>
+          {isLoading ? (
+            <StateNotice>Loading approved batches ready for fulfillment...</StateNotice>
+          ) : readyBatches.length === 0 ? (
+            <StateNotice>No batches are currently ready.</StateNotice>
+          ) : (
+            <table className="table-compact">
+              <caption className="sr-only">Batches that are approved and ready for fulfillment.</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Batch ID</th>
+                  <th scope="col">Department</th>
+                  <th scope="col">Items</th>
+                  <th scope="col">Status</th>
+                  <th scope="col">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {readyBatches.map((currentBatch, index) => {
+                  const batchStatus = getBatchStatusMeta(currentBatch);
+                  return (
+                    <tr key={currentBatch[0].batch_id} className={index % 2 === 0 ? "row-alt" : ""}>
+                      <td>{currentBatch[0].batch_id}</td>
+                      <td>{currentBatch[0].department}</td>
+                      <td>{currentBatch.length}</td>
+                      <td>
+                        <StatusBadge color={batchStatus.color} variant={batchStatus.variant} label={batchStatus.label} />
+                      </td>
+                      <td>
+                        <button
+                          className="btn btn-secondary btn-compact"
+                          onClick={() => handleOpenBatch(currentBatch[0].batch_id)}
+                          aria-label={`Open ready batch ${currentBatch[0].batch_id}`}
+                        >
+                          Open
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </section>
+      </div>
 
-          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-            <input
-              aria-label="Enter unique code to confirm"
-              value={code}
-              onChange={(event) => setCode(event.target.value)}
-              placeholder="Enter unique code to confirm"
-            />
-            <input
-              aria-label="Receiver Staff ID"
-              value={receiverId}
-              onChange={(event) => setReceiverId(event.target.value)}
-              placeholder="Receiver Staff ID (required)"
-            />
-            <button
-              className="btn btn-primary"
-              onClick={handleFulfill}
-              disabled={!selectedBatchReady || !code.trim() || !receiverId.trim()}
-            >
-              Fulfill Batch
-            </button>
-            <button className="btn btn-secondary" onClick={() => exportBatchToCSV(batch)}>
-              Export CSV
-            </button>
+      <section className="feature-card">
+        <div className="feature-card__header">
+          <div>
+            <h3>Lookup by Code</h3>
+            <p className="section-subtitle">Paste a pickup code to locate the matching batch and verify the receiver.</p>
           </div>
         </div>
-      )}
+
+        <div className="lookup-toolbar">
+          <label className="toolbar-field lookup-toolbar__field" htmlFor="lookup-code">
+            <span>Unique Code</span>
+            <input
+              id="lookup-code"
+              value={code}
+              onChange={(event) => setCode(event.target.value)}
+              placeholder="Enter unique code"
+            />
+          </label>
+          <button type="button" onClick={handleLookup} className="btn btn-primary">
+            Lookup
+          </button>
+        </div>
+
+        {batch && batch.length > 0 && (
+          <div className="batch-card batch-card--embedded">
+            <div className="batch-card__header">
+              <div className="batch-card__meta">
+                <div className="batch-card__title-row">
+                  <strong>Batch ID: {batch[0].batch_id}</strong>
+                  {(() => {
+                    const batchStatus = getBatchStatusMeta(batch);
+                    return (
+                      <StatusBadge color={batchStatus.color} variant={batchStatus.variant} className="batch-card__status">
+                        <span className="status-badge__icon">{batchStatus.icon}</span>
+                        {batchStatus.label}
+                      </StatusBadge>
+                    );
+                  })()}
+                </div>
+                <div className="batch-card__details">
+                  <span>Department: {batch[0].department}</span>
+                  <span>IT Item: {batch[0].is_it_item ? "Yes" : "No"}</span>
+                </div>
+              </div>
+            </div>
+
+            <table className="table-compact">
+              <caption className="sr-only">Selected batch {batch[0].batch_id} with its item details and fulfillment status.</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Item</th>
+                  <th scope="col">Category</th>
+                  <th scope="col">Type</th>
+                  <th scope="col">Quantity</th>
+                  <th scope="col">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {batch.map((item, index) => {
+                  const details = getItemDetails(item.item_id);
+                  return (
+                    <tr key={item.id} className={index % 2 === 0 ? "row-alt" : ""}>
+                      <td>{details.name}</td>
+                      <td>{details.category}</td>
+                      <td>{details.type}</td>
+                      <td>{item.quantity}</td>
+                      <td title={`Status: ${item.status}`}>{item.status}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+
+            <div className="lookup-toolbar lookup-toolbar--confirm">
+              <label className="toolbar-field lookup-toolbar__field">
+                <span>Confirm Unique Code</span>
+                <input
+                  aria-label="Enter unique code to confirm"
+                  value={code}
+                  onChange={(event) => setCode(event.target.value)}
+                  placeholder="Enter unique code to confirm"
+                />
+              </label>
+              <label className="toolbar-field lookup-toolbar__field">
+                <span>Receiver Staff ID</span>
+                <input
+                  aria-label="Receiver Staff ID"
+                  value={receiverId}
+                  onChange={(event) => setReceiverId(event.target.value)}
+                  placeholder="Receiver Staff ID"
+                />
+              </label>
+              <div className="modal-actions lookup-toolbar__actions">
+                <button
+                  className="btn btn-primary"
+                  onClick={handleFulfill}
+                  disabled={!selectedBatchReady || !code.trim() || !receiverId.trim()}
+                  aria-label={batch?.length ? `Fulfill batch ${batch[0].batch_id}` : "Fulfill selected batch"}
+                >
+                  Fulfill Batch
+                </button>
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => exportBatchToCSV(batch)}
+                  aria-label={batch?.length ? `Export batch ${batch[0].batch_id} to CSV` : "Export selected batch to CSV"}
+                >
+                  Export CSV
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </section>
 
       {message && <StateNotice>{message}</StateNotice>}
     </div>

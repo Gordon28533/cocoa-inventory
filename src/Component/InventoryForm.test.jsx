@@ -50,6 +50,7 @@ describe("InventoryForm", () => {
     renderForm(<InventoryForm setInventory={setInventory} />);
 
     expect(await screen.findByText(/Current Inventory Items/i)).toBeInTheDocument();
+    expect(screen.getByText(/Choose a stock category first to unlock the matching item IDs./i)).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText(/Category/i), {
       target: { value: "General Stock" }
@@ -78,8 +79,10 @@ describe("InventoryForm", () => {
     expect(setInventory).toHaveBeenCalledTimes(1);
 
     await waitFor(() => {
-      expect(screen.getByRole("alert")).toHaveTextContent(/Item added successfully!/i);
+      expect(screen.getByRole("status")).toHaveTextContent(/Item added successfully!/i);
     });
+
+    expect(screen.getByLabelText(/Quantity/i)).toHaveAttribute("aria-describedby", expect.stringContaining("inventory-form-quantity-help"));
   });
 
   it("supports edit mode through the passed handlers without fetching preview items", async () => {

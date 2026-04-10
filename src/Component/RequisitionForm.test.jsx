@@ -64,6 +64,7 @@ describe("RequisitionForm", () => {
       expect(screen.getByText(/You can only submit requisitions for your own department./i)).toBeInTheDocument();
     });
 
+    expect(screen.getByLabelText(/Department:/i)).toHaveAttribute("aria-invalid", "true");
     expect(screen.getByRole("button", { name: /Submit Requisition/i })).toBeDisabled();
     expect(api.createRequisition).not.toHaveBeenCalled();
     expect(setNotification).not.toHaveBeenCalled();
@@ -113,5 +114,6 @@ describe("RequisitionForm", () => {
     });
 
     expect(screen.getByText("PICK1234")).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent(/Requisition Submitted Successfully/i);
   });
 });

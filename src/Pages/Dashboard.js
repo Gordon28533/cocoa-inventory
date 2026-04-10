@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
 import PropTypes from "prop-types";
-import { useNavigate } from "react-router-dom";
 import InventoryForm from "../Component/InventoryForm.jsx";
 import RequisitionForm from "../Component/RequisitionForm.jsx";
 import RequisitionApproval from "../Component/RequisitionApproval.jsx";
@@ -11,6 +10,7 @@ import MyRequisitions from "../Component/MyRequisitions.jsx";
 import DepartmentManager from "../Component/DepartmentManager.jsx";
 import ModalCard from "../Component/ui/ModalCard.jsx";
 import { useAuth } from "../Context/AuthContext.js";
+import useDocumentTitle from "../hooks/useDocumentTitle.js";
 import { api } from "../utils/api.js";
 import "../styles.css";
 
@@ -18,20 +18,46 @@ const APPROVER_ROLES = ["account", "hod", "deputy_hod", "it_manager", "account_m
 const NON_REQUESTER_ROLES = [...APPROVER_ROLES, "stores"];
 const DASHBOARD_TABS = ["inventory", "requisition", "myreq", "approval", "fulfill", "audit", "departments"];
 
+const inferNotificationTone = (message) => {
+  const normalizedMessage = String(message || "").toLowerCase();
+
+  if (!normalizedMessage) {
+    return "success";
+  }
+
+  if (
+    normalizedMessage.includes("error") ||
+    normalizedMessage.includes("failed") ||
+    normalizedMessage.includes("invalid") ||
+    normalizedMessage.includes("cannot") ||
+    normalizedMessage.includes("unauthorized") ||
+    normalizedMessage.includes("not ")
+  ) {
+    return "error";
+  }
+
+  if (normalizedMessage.includes("warning") || normalizedMessage.includes("low")) {
+    return "warning";
+  }
+
+  return "success";
+};
+
 const Dashboard = ({
   inventory,
   setInventory,
   isLoading = false
 }) => {
-  const navigate = useNavigate();
-  const { token, user, role: userRole, currentPath, setCurrentPath, logout } = useAuth();
+  const { token, user, role: userRole, currentPath, setCurrentPath } = useAuth();
   const [activeTab, setActiveTab] = useState("inventory");
   const [editItem, setEditItem] = useState(null);
   const [editModalOpen, setEditModalOpen] = useState(false);
-  const [notification, setNotification] = useState("");
+  const [notification, setNotification] = useState({ message: "", tone: "success" });
   const isApprover = APPROVER_ROLES.includes(userRole);
   const canRequest = !NON_REQUESTER_ROLES.includes(userRole);
   const isAdmin = userRole === "admin";
+
+  useDocumentTitle("Workspace");
 
   const tabButtons = useMemo(() => {
     const tabs = [{ key: "inventory", label: "Inventory List" }];
@@ -99,24 +125,48 @@ const Dashboard = ({
     setCurrentPath(`/dashboard?tab=${tab}`);
   };
 
+  const getTabId = (tab) => `dashboard-tab-${tab}`;
+  const getPanelId = (tab) => `dashboard-panel-${tab}`;
+
+  const showNotification = (nextNotification) => {
+    if (!nextNotification) {
+      setNotification({ message: "", tone: "success" });
+      return;
+    }
+
+    if (typeof nextNotification === "string") {
+      setNotification({
+        message: nextNotification,
+        tone: inferNotificationTone(nextNotification)
+      });
+      return;
+    }
+
+    const nextMessage = nextNotification.message || "";
+    setNotification({
+      message: nextMessage,
+      tone: nextNotification.tone || inferNotificationTone(nextMessage)
+    });
+  };
+
   const handleEditSubmit = async (updatedItem) => {
     try {
       await api.updateItem(updatedItem.id, updatedItem);
       setInventory((previous) => previous.map((item) => (item.id === updatedItem.id ? updatedItem : item)));
-      setNotification("Item updated successfully!");
+      showNotification({ message: "Item updated successfully!", tone: "success" });
       setEditModalOpen(false);
       setEditItem(null);
     } catch (error) {
-      setNotification(error.message || "Network error. Please try again.");
+      showNotification({ message: error.message || "Network error. Please try again.", tone: "error" });
     }
   };
 
   useEffect(() => {
-    if (!notification) {
+    if (!notification.message) {
       return undefined;
     }
 
-    const timeoutId = window.setTimeout(() => setNotification(""), 3000);
+    const timeoutId = window.setTimeout(() => setNotification({ message: "", tone: "success" }), 3000);
     return () => window.clearTimeout(timeoutId);
   }, [notification]);
 
@@ -138,34 +188,31 @@ const Dashboard = ({
           <p className="dashboard-welcome">
             Welcome back, {user || "team member"}! Manage your inventory efficiently.
           </p>
-        </div>
-        <div className="dashboard-actions">
-          <button
-            onClick={() => navigate("/change-password")}
-            className="btn btn-primary"
-            aria-label="Go to change password page"
-          >
-            Change Password
-          </button>
-          <button onClick={logout} className="btn btn-secondary" aria-label="Logout from the system">
-            Logout
-          </button>
+          <p className="dashboard-subtitle">
+            Use the tabs below to move between inventory, requisitions, approvals, fulfillment, and administration tasks.
+          </p>
         </div>
       </div>
 
-      {notification && (
+      {notification.message && (
         <div className="notification-banner">
-          <div className="notification-banner__content">{notification}</div>
+          <div className={`notification-banner__content notification-banner__content--${notification.tone}`}>
+            {notification.message}
+          </div>
         </div>
       )}
 
-      <div className="nav-tabs">
+      <div className="nav-tabs" role="tablist" aria-label="Workspace tabs">
         {tabButtons.map((tab) => (
           <button
             key={tab.key}
+            id={getTabId(tab.key)}
             className={`nav-tab ${activeTab === tab.key ? "active" : ""}`}
             onClick={() => handleTabChange(tab.key)}
-            aria-pressed={activeTab === tab.key}
+            role="tab"
+            aria-selected={activeTab === tab.key}
+            aria-controls={getPanelId(tab.key)}
+            tabIndex={activeTab === tab.key ? 0 : -1}
           >
             {tab.label}
           </button>
@@ -173,7 +220,12 @@ const Dashboard = ({
       </div>
 
       {activeTab === "inventory" && (
-        <>
+        <section
+          id={getPanelId("inventory")}
+          role="tabpanel"
+          aria-labelledby={getTabId("inventory")}
+          tabIndex={0}
+        >
           <InventoryList
             inventory={inventory}
             setInventory={setInventory}
@@ -187,55 +239,97 @@ const Dashboard = ({
             }
           />
           {editModalOpen && (
-            <ModalCard title="Edit Inventory Item">
-                <InventoryForm
-                  setInventory={setInventory}
-                  initialItem={editItem}
-                  onSubmit={handleEditSubmit}
-                  onCancel={() => {
-                    setEditModalOpen(false);
-                    setEditItem(null);
-                  }}
-                  isEdit
-                />
+            <ModalCard
+              title="Edit Inventory Item"
+              onClose={() => {
+                setEditModalOpen(false);
+                setEditItem(null);
+              }}
+            >
+              <InventoryForm
+                setInventory={setInventory}
+                initialItem={editItem}
+                onSubmit={handleEditSubmit}
+                onCancel={() => {
+                  setEditModalOpen(false);
+                  setEditItem(null);
+                }}
+                isEdit
+              />
             </ModalCard>
           )}
-        </>
+        </section>
       )}
 
       {activeTab === "requisition" && canRequest && (
-        <div className="form-container">
+        <div
+          className="form-container"
+          id={getPanelId("requisition")}
+          role="tabpanel"
+          aria-labelledby={getTabId("requisition")}
+          tabIndex={0}
+        >
           <h3>Create Requisition</h3>
-          <RequisitionForm inventory={inventory} setNotification={setNotification} />
+          <RequisitionForm inventory={inventory} setNotification={showNotification} />
         </div>
       )}
 
       {activeTab === "approval" && isApprover && (
-        <div className="form-container">
-          <RequisitionApproval setNotification={setNotification} inventory={inventory} />
+        <div
+          className="form-container"
+          id={getPanelId("approval")}
+          role="tabpanel"
+          aria-labelledby={getTabId("approval")}
+          tabIndex={0}
+        >
+          <RequisitionApproval setNotification={showNotification} inventory={inventory} />
         </div>
       )}
 
       {activeTab === "fulfill" && userRole === "stores" && (
-        <div className="form-container">
-          <RequisitionFulfill setNotification={setNotification} inventory={inventory} />
+        <div
+          className="form-container"
+          id={getPanelId("fulfill")}
+          role="tabpanel"
+          aria-labelledby={getTabId("fulfill")}
+          tabIndex={0}
+        >
+          <RequisitionFulfill setNotification={showNotification} inventory={inventory} />
         </div>
       )}
 
       {activeTab === "audit" && isAdmin && (
-        <div className="form-container">
+        <div
+          className="form-container"
+          id={getPanelId("audit")}
+          role="tabpanel"
+          aria-labelledby={getTabId("audit")}
+          tabIndex={0}
+        >
           <AuditLogViewer />
         </div>
       )}
 
       {activeTab === "departments" && isAdmin && (
-        <div className="form-container">
-          <DepartmentManager setNotification={setNotification} />
+        <div
+          className="form-container"
+          id={getPanelId("departments")}
+          role="tabpanel"
+          aria-labelledby={getTabId("departments")}
+          tabIndex={0}
+        >
+          <DepartmentManager setNotification={showNotification} />
         </div>
       )}
 
       {activeTab === "myreq" && canRequest && (
-        <div className="form-container">
+        <div
+          className="form-container"
+          id={getPanelId("myreq")}
+          role="tabpanel"
+          aria-labelledby={getTabId("myreq")}
+          tabIndex={0}
+        >
           <MyRequisitions inventory={inventory} />
         </div>
       )}

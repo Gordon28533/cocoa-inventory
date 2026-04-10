@@ -53,6 +53,13 @@ Key files:
   - audit log viewing
 - added focused frontend tests plus app-shell integration coverage
 - introduced shared UI helpers for modal, status, and state display patterns
+- polished frontend accessibility and consistency with:
+  - route-level document titles
+  - skip-link and tab semantics
+  - modal focus trapping and focus return
+  - improved form descriptions and error associations
+  - denser table captions and row-specific action labels
+  - more consistent loading/success/error wording
 
 Key files:
 
@@ -93,6 +100,13 @@ npm run lint
 npm run check:backend
 npm run build
 npm run smoke:startup
+```
+
+Latest frontend verification:
+
+```text
+11/11 frontend suites passing
+33/33 frontend tests passing
 ```
 
 Additional live smoke check:

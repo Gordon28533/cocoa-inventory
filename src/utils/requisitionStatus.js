@@ -4,20 +4,20 @@ export function getBatchStatusMeta(batch) {
   const statuses = batch.map((item) => item.status);
 
   if (statuses.every((status) => status === "fulfilled")) {
-    return { label: "Fulfilled", icon: "Done", color: "#28a745" };
+    return { label: "Fulfilled", icon: "Done", color: "#28a745", variant: "success" };
   }
 
   if (statuses.every((status) => APPROVED_BATCH_STATUSES.has(status))) {
-    return { label: "Approved", icon: "Approved", color: "#1976d2" };
+    return { label: "Approved", icon: "Approved", color: "#1976d2", variant: "info" };
   }
 
   if (statuses.every((status) => status === "pending")) {
-    return { label: "Pending", icon: "Pending", color: "#ffc107" };
+    return { label: "Pending", icon: "Pending", color: "#ffc107", variant: "warning" };
   }
 
   if (statuses.some((status) => status === "rejected")) {
-    return { label: "Rejected", icon: "Rejected", color: "#dc3545" };
+    return { label: "Rejected", icon: "Rejected", color: "#dc3545", variant: "danger" };
   }
 
-  return { label: "In Progress", icon: "In Progress", color: "#888" };
+  return { label: "In Progress", icon: "In Progress", color: "#888", variant: "neutral" };
 }

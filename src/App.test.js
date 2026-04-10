@@ -1,6 +1,6 @@
 /* eslint-disable react/prop-types */
 import React from "react";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import App from "./App.js";
 import { api } from "./utils/api.js";
 
@@ -111,15 +111,42 @@ describe("App", () => {
     render(<App />);
 
     expect(await screen.findByText(/Admin Users Stub/i)).toBeInTheDocument();
+    expect(screen.getByText(/Workspace/i)).toBeInTheDocument();
     expect(screen.getByText(/User Management/i)).toBeInTheDocument();
-    expect(screen.getByText(/Audit Logs/i)).toBeInTheDocument();
     expect(screen.getByText(/Logout/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Open navigation menu/i })).toHaveAttribute("aria-expanded", "false");
 
     expect(api.validateToken).toHaveBeenCalledTimes(1);
     expect(api.getItems).toHaveBeenCalledTimes(1);
   });
 
-  it("blocks non-admin users from the admin route and keeps requester nav visible", async () => {
+  it("toggles the compact navigation menu for authenticated users", async () => {
+    setSession({
+      token: "admin-token",
+      role: "admin",
+      user: "Grace Admin",
+      currentPath: "/dashboard"
+    });
+    window.history.pushState({}, "", "/dashboard");
+
+    api.validateToken.mockResolvedValue({
+      id: 1,
+      staffName: "Grace Admin",
+      role: "admin"
+    });
+    api.getItems.mockResolvedValue([{ id: "INV-1" }]);
+
+    render(<App />);
+
+    await screen.findByText(/Dashboard Stub/i);
+
+    const menuToggle = screen.getByRole("button", { name: /Open navigation menu/i });
+    fireEvent.click(menuToggle);
+
+    expect(screen.getByRole("button", { name: /Close navigation menu/i })).toHaveAttribute("aria-expanded", "true");
+  });
+
+  it("blocks non-admin users from the admin route and keeps workspace navigation visible", async () => {
     setSession({
       token: "user-token",
       role: "user",
@@ -138,7 +165,7 @@ describe("App", () => {
     render(<App />);
 
     expect(await screen.findByText(/Unauthorized/i)).toBeInTheDocument();
-    expect(screen.getByText(/My Requisitions/i)).toBeInTheDocument();
+    expect(screen.getByText(/Workspace/i)).toBeInTheDocument();
     expect(screen.queryByText(/User Management/i)).not.toBeInTheDocument();
   });
 

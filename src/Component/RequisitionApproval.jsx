@@ -156,11 +156,11 @@ const RequisitionApproval = ({ setNotification, inventory }) => {
     try {
       const data = await api.approveRequisition(0, { batch_id: batchId });
       if (data.success) {
-        showFeedback("Batch approved!");
+        showFeedback("Batch approved successfully.");
         await fetchRequisitions();
       }
     } catch (error) {
-      showFeedback(error.message || "Approval failed.");
+      showFeedback(error.message || "Unable to approve the batch. Please try again.");
     }
   };
 
@@ -189,20 +189,30 @@ const RequisitionApproval = ({ setNotification, inventory }) => {
     setSortAsc((current) => (sortKey === nextSortKey ? !current : true));
   };
 
-  return (
-    <div>
-      <h2>Requisitions to Approve</h2>
+  const getAriaSort = (columnKey) => {
+    if (sortKey !== columnKey) {
+      return "none";
+    }
 
-      <div style={{ display: "flex", gap: 16, marginBottom: 16, flexWrap: "wrap" }}>
-        <label htmlFor="approval-filter-department">
-          Department:
-          <select
-            id="approval-filter-department"
-            value={filterDept}
-            onChange={(event) => setFilterDept(event.target.value)}
-            style={{ marginLeft: 8 }}
-          >
-            <option value="">All</option>
+    return sortAsc ? "ascending" : "descending";
+  };
+
+  return (
+    <div className="feature-panel">
+      <div className="feature-panel__header">
+        <div>
+          <h2>Requisitions to Approve</h2>
+          <p className="section-subtitle">
+            Review batches waiting at your approval stage, filter by department or status, and export details when needed.
+          </p>
+        </div>
+      </div>
+
+      <div className="filter-toolbar">
+        <label className="toolbar-field">
+          <span>Department</span>
+          <select id="approval-filter-department" value={filterDept} onChange={(event) => setFilterDept(event.target.value)}>
+            <option value="">All departments</option>
             {allDepts.map((department) => (
               <option key={department} value={department}>
                 {department}
@@ -211,15 +221,10 @@ const RequisitionApproval = ({ setNotification, inventory }) => {
           </select>
         </label>
 
-        <label htmlFor="approval-filter-status">
-          Status:
-          <select
-            id="approval-filter-status"
-            value={filterStatus}
-            onChange={(event) => setFilterStatus(event.target.value)}
-            style={{ marginLeft: 8 }}
-          >
-            <option value="">All</option>
+        <label className="toolbar-field">
+          <span>Status</span>
+          <select id="approval-filter-status" value={filterStatus} onChange={(event) => setFilterStatus(event.target.value)}>
+            <option value="">All statuses</option>
             {allStatuses.map((status) => (
               <option key={status} value={status}>
                 {status}
@@ -232,67 +237,99 @@ const RequisitionApproval = ({ setNotification, inventory }) => {
       {message && <StateNotice>{message}</StateNotice>}
 
       {isLoading ? (
-        <StateNotice>Loading...</StateNotice>
+        <StateNotice>Loading requisitions awaiting your review...</StateNotice>
       ) : filteredBatches.length === 0 ? (
         <StateNotice>No requisitions to approve.</StateNotice>
       ) : (
-        filteredBatches.map((batch) => (
-          <div key={batch[0].batch_id} className="batch-card">
-            <div className="batch-card__header">
-              Batch ID: {batch[0].batch_id} | Department: {getDepartmentName(batch[0].department_id)} | IT Item:{" "}
-              {batch[0].is_it_item ? "Yes" : "No"}
-              <StatusBadge color={getBatchStatusMeta(batch).color} className="batch-card__status">
-                <span style={{ fontSize: 14 }}>{getBatchStatusMeta(batch).icon}</span>
-                {getBatchStatusMeta(batch).label}
-              </StatusBadge>
-            </div>
+        filteredBatches.map((batch) => {
+          const batchStatus = getBatchStatusMeta(batch);
 
-            <table className="table-compact">
-              <thead>
-                <tr>
-                  <th onClick={() => handleSortChange("item_id")}>
-                    Item
-                  </th>
-                  <th onClick={() => handleSortChange("category")}>
-                    Category
-                  </th>
-                  <th onClick={() => handleSortChange("type")}>
-                    Type
-                  </th>
-                  <th onClick={() => handleSortChange("quantity")}>
-                    Quantity
-                  </th>
-                  <th onClick={() => handleSortChange("status")}>
-                    Status
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {batch.map((requisition, index) => {
-                  const details = getItemDetails(inventory, requisition.item_id);
-                  return (
-                    <tr key={requisition.id} className={index % 2 === 0 ? "row-alt" : ""}>
-                      <td>{details.name}</td>
-                      <td>{details.category}</td>
-                      <td>{details.type}</td>
-                      <td>{requisition.quantity}</td>
-                      <td title={`Status: ${requisition.status}`}>{requisition.status}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+          return (
+            <div key={batch[0].batch_id} className="batch-card">
+              <div className="batch-card__header">
+                <div className="batch-card__meta">
+                  <div className="batch-card__title-row">
+                    <strong>Batch ID: {batch[0].batch_id}</strong>
+                    <StatusBadge variant={batchStatus.variant} color={batchStatus.color} className="batch-card__status">
+                      <span className="status-badge__icon">{batchStatus.icon}</span>
+                      {batchStatus.label}
+                    </StatusBadge>
+                  </div>
+                  <div className="batch-card__details">
+                    <span>Department: {getDepartmentName(batch[0].department_id)}</span>
+                    <span>IT Item: {batch[0].is_it_item ? "Yes" : "No"}</span>
+                  </div>
+                </div>
+              </div>
 
-            <div className="batch-card__footer" style={{ justifyContent: "flex-start", gap: 12 }}>
-              <button className="btn btn-primary" onClick={() => handleBatchApprove(batch[0].batch_id)}>
-                Approve Batch
-              </button>
-              <button className="btn btn-secondary" onClick={() => exportBatchToCSV(batch)}>
-                Export CSV
-              </button>
+              <table className="table-compact">
+                <caption className="sr-only">
+                  Requisition batch {batch[0].batch_id} for {getDepartmentName(batch[0].department_id)}.
+                </caption>
+                <thead>
+                  <tr>
+                    <th scope="col" aria-sort={getAriaSort("item_id")}>
+                      <button type="button" className="table-sort-button" onClick={() => handleSortChange("item_id")}>
+                        Item
+                      </button>
+                    </th>
+                    <th scope="col" aria-sort={getAriaSort("category")}>
+                      <button type="button" className="table-sort-button" onClick={() => handleSortChange("category")}>
+                        Category
+                      </button>
+                    </th>
+                    <th scope="col" aria-sort={getAriaSort("type")}>
+                      <button type="button" className="table-sort-button" onClick={() => handleSortChange("type")}>
+                        Type
+                      </button>
+                    </th>
+                    <th scope="col" aria-sort={getAriaSort("quantity")}>
+                      <button type="button" className="table-sort-button" onClick={() => handleSortChange("quantity")}>
+                        Quantity
+                      </button>
+                    </th>
+                    <th scope="col" aria-sort={getAriaSort("status")}>
+                      <button type="button" className="table-sort-button" onClick={() => handleSortChange("status")}>
+                        Status
+                      </button>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {batch.map((requisition, index) => {
+                    const details = getItemDetails(inventory, requisition.item_id);
+                    return (
+                      <tr key={requisition.id} className={index % 2 === 0 ? "row-alt" : ""}>
+                        <td>{details.name}</td>
+                        <td>{details.category}</td>
+                        <td>{details.type}</td>
+                        <td>{requisition.quantity}</td>
+                        <td title={`Status: ${requisition.status}`}>{requisition.status}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+
+              <div className="batch-card__footer batch-card__footer--leading">
+                <button
+                  className="btn btn-primary"
+                  onClick={() => handleBatchApprove(batch[0].batch_id)}
+                  aria-label={`Approve batch ${batch[0].batch_id}`}
+                >
+                  Approve Batch
+                </button>
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => exportBatchToCSV(batch)}
+                  aria-label={`Export batch ${batch[0].batch_id} to CSV`}
+                >
+                  Export CSV
+                </button>
+              </div>
             </div>
-          </div>
-        ))
+          );
+        })
       )}
     </div>
   );

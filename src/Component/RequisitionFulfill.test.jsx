@@ -97,6 +97,6 @@ describe("RequisitionFulfill", () => {
       });
     });
 
-    expect(setNotification).toHaveBeenCalledWith("Batch fulfilled!");
+    expect(setNotification).toHaveBeenCalledWith("Batch fulfilled successfully.");
   });
 });

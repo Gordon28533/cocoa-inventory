@@ -20,6 +20,8 @@ This release delivers a major project cleanup across backend architecture, front
 - improved dashboard, login, admin, inventory, and requisition flows
 - added focused component and app-shell tests
 - introduced reusable UI patterns for modal, status, and state display
+- polished frontend accessibility and consistency across page titles, skip links, tabs, modal focus, form error wiring, dense data tables, and mobile navigation
+- unified loading, success, and retry-oriented feedback language across the main workflows
 
 ### Operations and tooling
 
@@ -33,7 +35,7 @@ This release delivers a major project cleanup across backend architecture, front
 ## Validation completed
 
 - backend test suite passing
-- frontend test suite passing
+- frontend test suite passing (`11/11` suites, `33/33` tests)
 - lint passing
 - backend syntax checks passing
 - production build passing

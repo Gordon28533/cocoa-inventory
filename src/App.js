@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { BrowserRouter as Router, Navigate, NavLink, Route, Routes } from "react-router-dom";
 import StockAlert from "./Component/StockAlert.jsx";
 import AuditLogViewer from "./Component/AuditLogViewer.jsx";
@@ -13,17 +13,13 @@ import ChangePasswordPage from "./Pages/ChangePasswordPage.js";
 import { api } from "./utils/api.js";
 import "./styles.css";
 
-const NON_REQUESTER_ROLES = ["account", "hod", "deputy_hod", "it_manager", "account_manager", "stores"];
+const getNavLinkClassName = ({ isActive }) => `app-nav__link${isActive ? " app-nav__link--active" : ""}`;
 
 const AppContent = () => {
   const { token, role, currentPath, logout, isAuthChecked, errorMsg } = useAuth();
   const [inventory, setInventory] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-
-  const showMyRequisitionsNav = useMemo(
-    () => token && !NON_REQUESTER_ROLES.includes(role),
-    [role, token]
-  );
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     if (!token) {
@@ -66,29 +62,26 @@ const AppContent = () => {
     };
   }, [isAuthChecked, token]);
 
+  useEffect(() => {
+    if (!token) {
+      setIsMobileMenuOpen(false);
+    }
+  }, [token]);
+
+  const closeMobileMenu = () => setIsMobileMenuOpen(false);
+
+  const handleLogout = () => {
+    closeMobileMenu();
+    logout();
+  };
+
   if (!isAuthChecked) {
     return (
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          height: "100vh",
-          background: "linear-gradient(135deg, rgba(102, 126, 234, 0.9) 0%, rgba(118, 75, 162, 0.9) 100%)"
-        }}
-      >
-        <div
-          style={{
-            background: "white",
-            padding: "40px",
-            borderRadius: "20px",
-            textAlign: "center",
-            boxShadow: "0 20px 60px rgba(0,0,0,0.1)"
-          }}
-        >
-          <h2>Loading...</h2>
-          <p>Checking authentication...</p>
-          {errorMsg && <div style={{ color: "#d32f2f", marginTop: 16, fontWeight: 600 }}>{errorMsg}</div>}
+      <div className="auth-loading-screen">
+        <div className="auth-loading-card">
+          <h2>Loading your session...</h2>
+          <p>Checking your authentication state before opening the workspace.</p>
+          {errorMsg && <div className="auth-loading-error">{errorMsg}</div>}
         </div>
       </div>
     );
@@ -98,6 +91,9 @@ const AppContent = () => {
     <DepartmentsProvider>
       <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <div className="container">
+          <a href="#main-content" className="skip-link">
+            Skip to main content
+          </a>
           <header>
             <div className="header-content">
               <img src="/cmc_logo1.jpg" alt="Cocoa Marketing Company Logo" className="logo" />
@@ -106,87 +102,48 @@ const AppContent = () => {
                 <p>Cocoa Marketing Company</p>
               </div>
               {token && (
-                <div style={{ display: "flex", alignItems: "center", gap: "20px", marginTop: 10 }}>
-                  <nav style={{ display: "flex", gap: 16 }}>
-                    <NavLink
-                      to="/dashboard"
-                      style={({ isActive }) => ({
-                        fontWeight: isActive ? "bold" : "normal",
-                        color: isActive ? "#1976d2" : "#333",
-                        textDecoration: "none"
-                      })}
-                    >
-                      Dashboard
-                    </NavLink>
-                    <NavLink
-                      to="/inventory/GEN001"
-                      style={({ isActive }) => ({
-                        fontWeight: isActive ? "bold" : "normal",
-                        color: isActive ? "#1976d2" : "#333",
-                        textDecoration: "none"
-                      })}
-                    >
-                      Inventory
-                    </NavLink>
-                    {showMyRequisitionsNav && (
-                      <NavLink
-                        to="/dashboard?tab=myreq"
-                        style={({ isActive }) => ({
-                          fontWeight: isActive ? "bold" : "normal",
-                          color: isActive ? "#1976d2" : "#333",
-                          textDecoration: "none"
-                        })}
-                      >
-                        My Requisitions
-                      </NavLink>
-                    )}
-                    {role === "admin" && (
-                      <NavLink
-                        to="/admin/users"
-                        style={({ isActive }) => ({
-                          fontWeight: isActive ? "bold" : "normal",
-                          color: isActive ? "#1976d2" : "#333",
-                          textDecoration: "none"
-                        })}
-                      >
-                        User Management
-                      </NavLink>
-                    )}
-                    {role === "admin" && (
-                      <NavLink
-                        to="/audit-logs"
-                        style={({ isActive }) => ({
-                          fontWeight: isActive ? "bold" : "normal",
-                          color: isActive ? "#1976d2" : "#333",
-                          textDecoration: "none"
-                        })}
-                      >
-                        Audit Logs
-                      </NavLink>
-                    )}
-                  </nav>
+                <>
                   <button
-                    onClick={logout}
-                    style={{
-                      background: "#dc3545",
-                      color: "white",
-                      border: "none",
-                      padding: "8px 16px",
-                      borderRadius: "4px",
-                      cursor: "pointer",
-                      fontSize: "14px"
-                    }}
+                    type="button"
+                    className="app-nav-toggle"
+                    aria-expanded={isMobileMenuOpen}
+                    aria-controls="app-primary-nav"
+                    aria-label={isMobileMenuOpen ? "Close navigation menu" : "Open navigation menu"}
+                    onClick={() => setIsMobileMenuOpen((current) => !current)}
                   >
-                    Logout
+                    <span className="app-nav-toggle__icon" aria-hidden="true">
+                      {isMobileMenuOpen ? "X" : "|||"}
+                    </span>
+                    <span>{isMobileMenuOpen ? "Close" : "Menu"}</span>
                   </button>
-                </div>
+                  <div className={`app-shell-controls${isMobileMenuOpen ? " app-shell-controls--open" : ""}`}>
+                    <nav id="app-primary-nav" className="app-nav" aria-label="Primary navigation">
+                      <NavLink to="/dashboard" className={getNavLinkClassName} onClick={closeMobileMenu}>
+                        Workspace
+                      </NavLink>
+                      {role === "admin" && (
+                        <NavLink to="/admin/users" className={getNavLinkClassName} onClick={closeMobileMenu}>
+                          User Management
+                        </NavLink>
+                      )}
+                    </nav>
+                    <div className="app-shell-actions">
+                      <NavLink to="/change-password" className="btn btn-secondary" onClick={closeMobileMenu}>
+                        Change Password
+                      </NavLink>
+                      <button onClick={handleLogout} className="btn btn-danger">
+                        Logout
+                      </button>
+                    </div>
+                  </div>
+                </>
               )}
             </div>
           </header>
 
           {!isLoading && token && role === "stores" && <StockAlert inventory={inventory} />}
 
-          <main>
+          <main id="main-content" tabIndex={-1}>
             <Routes>
               <Route path="/login" element={<LoginPage />} />
               <Route path="/" element={<Navigate to="/login" replace />} />
@@ -200,6 +157,7 @@ const AppContent = () => {
                   )
                 }
               />
+              <Route path="/inventory" element={token ? <Navigate to="/dashboard?tab=inventory" replace /> : <Navigate to="/" />} />
               <Route
                 path="/inventory/:id"
                 element={token ? <InventoryDetails inventory={inventory} /> : <Navigate to="/" />}
@@ -223,7 +181,7 @@ const AppContent = () => {
               <Route
                 path="/unauthorized"
                 element={
-                  <div style={{ padding: 40, textAlign: "center" }}>
+                  <div className="page-message-card">
                     <h2>Unauthorized</h2>
                     <p>You do not have permission to access this page.</p>
                   </div>

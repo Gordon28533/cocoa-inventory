@@ -228,6 +228,12 @@ Main endpoints are mounted at the backend root, not under `/api`.
 
 For the fuller request/response and role contract, see [docs/api-contract.md](/C:/Users/PC/cocoa-inventory/docs/api-contract.md).
 
+## Frontend accessibility
+
+The frontend now follows shared accessibility patterns for page titles, live feedback, modal focus, form descriptions, and dense data tables.
+
+For the current working conventions, see [docs/accessibility-guidelines.md](/C:/Users/PC/cocoa-inventory/docs/accessibility-guidelines.md).
+
 ## Deployment
 
 - `npm run build`
