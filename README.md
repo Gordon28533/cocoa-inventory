@@ -1,6 +1,6 @@
 #  Inventory Management System
 
-A React + Node.js inventory and requisition system for Cocoa Marketing Company. The app includes role-based access control, inventory management, requisition approvals, fulfillment, audit logging, and a project-managed local MySQL workflow for development.
+A React + Node.js inventory and requisition system. The app includes role-based access control, inventory management, requisition approvals, fulfillment, audit logging, and a project-managed local MySQL workflow for development.
 
 ## Highlights
 
