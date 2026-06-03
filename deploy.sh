@@ -1,11 +1,11 @@
 #!/bin/bash
 
-# Cocoa Inventory System - Deployment Script
+# Inventory System - Deployment Script
 # Run this script from the project root directory
 
 set -e  # Exit on any error
 
-echo "🚀 Starting Cocoa Inventory deployment..."
+echo "🚀 Starting Inventory System deployment..."
 
 # Check if we're in the right directory
 if [ ! -f "package.json" ]; then
@@ -41,13 +41,13 @@ fi
 
 # Stop existing PM2 process if running
 echo "🛑 Stopping existing processes..."
-pm2 stop cocoa-backend 2>/dev/null || true
-pm2 delete cocoa-backend 2>/dev/null || true
+pm2 stop inventory-backend 2>/dev/null || true
+pm2 delete inventory-backend 2>/dev/null || true
 
 # Start backend with PM2
 echo "🚀 Starting backend with PM2..."
 cd Backend
-pm2 start server.js --name cocoa-backend --env production
+pm2 start server.js --name inventory-backend --env production
 cd ..
 
 # Save PM2 configuration
@@ -60,5 +60,5 @@ pm2 status
 
 echo "✅ Deployment completed successfully!"
 echo "🌐 Your application should be running on http://localhost:5000"
-echo "📋 Use 'pm2 logs cocoa-backend' to view logs"
-echo "📋 Use 'pm2 restart cocoa-backend' to restart the application" 
+echo "📋 Use 'pm2 logs inventory-backend' to view logs"
+echo "📋 Use 'pm2 restart inventory-backend' to restart the application" 

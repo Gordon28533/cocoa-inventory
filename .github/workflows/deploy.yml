@@ -5,35 +5,64 @@ on:
     branches: [ main ]
 
 jobs:
+  # L-5: Separate build-verify from deploy so the frontend is only built once
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # M-9: CI=false removed — lint warnings now fail the build as they should
+      - name: Build frontend
+        run: npm run build
+
+      - name: Run backend tests
+        run: npm run test:backend
+
+      - name: Upload build artefact
+        uses: actions/upload-artifact@v3
+        with:
+          name: frontend-build
+          path: build/
+          retention-days: 1
+
   deploy:
     runs-on: ubuntu-latest
-    
+    needs: build-and-test
     steps:
-    - uses: actions/checkout@v3
-    
-    - name: Setup Node.js
-      uses: actions/setup-node@v3
-      with:
-        node-version: '18'
-        cache: 'npm'
-    
-    - name: Install dependencies
-      run: npm ci
-    
-    - name: Build
-      run: npm run build
-      env:
-        CI: false
-    
-    - name: Deploy to server
-      uses: appleboy/ssh-action@master
-      with:
-        host: ${{ secrets.HOST }}
-        username: ${{ secrets.USERNAME }}
-        key: ${{ secrets.SSH_KEY }}
-        script: |
-          cd /opt/cocoa-inventory
-          git pull
-          npm ci
-          npm run build
-          pm2 restart cocoa-backend
+      - name: Download build artefact
+        uses: actions/download-artifact@v3
+        with:
+          name: frontend-build
+          path: build/
+
+      # L-5: Server now receives the pre-built artefact via rsync instead of
+      #       rebuilding from source, eliminating the double-build.
+      - name: Sync build to server
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.SSH_KEY }}
+          source: "build/"
+          target: "/opt/cocoa-inventory/"
+
+      - name: Restart backend
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            cd /opt/cocoa-inventory
+            git pull
+            npm ci --omit=dev
+            pm2 restart cocoa-backend

@@ -109,7 +109,7 @@ cmd /c "set CI=true&& npm test -- --watch=false"
 npm run test:backend
 ```
 
-Backend tests run in-process against the app factory in [Backend/app.js](/C:/Users/PC/cocoa-inventory/Backend/app.js). They do not require a separately running server.
+Backend tests run in-process against the app factory in [Backend/app.js](/C:/Users/PC/inventory-system/Backend/app.js). They do not require a separately running server.
 
 ## Build and quality checks
 
@@ -136,7 +136,7 @@ Additional scoped scripts:
 ## Project structure
 
 ```text
-cocoa-inventory/
+inventory-system/
 |-- Backend/
 |   |-- app.js
 |   |-- server.js
@@ -226,25 +226,25 @@ Main endpoints are mounted at the backend root, not under `/api`.
 - `PUT /requisitions/batch/:batch_id/fulfill`
 - `GET /requisitions/code/:code`
 
-For the fuller request/response and role contract, see [docs/api-contract.md](/C:/Users/PC/cocoa-inventory/docs/api-contract.md).
+For the fuller request/response and role contract, see [docs/api-contract.md](/C:/Users/PC/inventory-system/docs/api-contract.md).
 
 ## Frontend accessibility
 
 The frontend now follows shared accessibility patterns for page titles, live feedback, modal focus, form descriptions, and dense data tables.
 
-For the current working conventions, see [docs/accessibility-guidelines.md](/C:/Users/PC/cocoa-inventory/docs/accessibility-guidelines.md).
+For the current working conventions, see [docs/accessibility-guidelines.md](/C:/Users/PC/inventory-system/docs/accessibility-guidelines.md).
 
 ## Deployment
 
 - `npm run build`
 - `npm run start-backend`
 
-The backend serves the production React build from `build/` when started through [Backend/server.js](/C:/Users/PC/cocoa-inventory/Backend/server.js).
+The backend serves the production React build from `build/` when started through [Backend/server.js](/C:/Users/PC/inventory-system/Backend/server.js).
 
 Production helpers:
 
-- [ecosystem.config.cjs](/C:/Users/PC/cocoa-inventory/ecosystem.config.cjs) for PM2
-- [smoke-startup.mjs](/C:/Users/PC/cocoa-inventory/scripts/smoke-startup.mjs) for `/health` and optional login smoke checks
+- [ecosystem.config.cjs](/C:/Users/PC/inventory-system/ecosystem.config.cjs) for PM2
+- [smoke-startup.mjs](/C:/Users/PC/inventory-system/scripts/smoke-startup.mjs) for `/health` and optional login smoke checks
 
 ## Notes
 

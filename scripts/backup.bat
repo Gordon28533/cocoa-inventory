@@ -1,8 +1,8 @@
 @echo off
 setlocal enabledelayedexpansion
 
-set BACKUP_DIR=C:\backups\cocoa-inventory
-set APP_DIR=C:\opt\cocoa-inventory
+set BACKUP_DIR=C:\backups\inventory-system
+set APP_DIR=C:\opt\inventory-system
 set DB_NAME=CMC_Inventory
 set DB_USER=cocoa_user
 set DB_PASS=your_secure_password

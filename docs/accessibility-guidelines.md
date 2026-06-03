@@ -15,13 +15,13 @@ This project now relies on a small set of frontend accessibility conventions. Wh
 
 ## Existing shared patterns
 
-- [useDocumentTitle.js](/C:/Users/PC/cocoa-inventory/src/hooks/useDocumentTitle.js)
+- [useDocumentTitle.js](/C:/Users/PC/inventory-system/src/hooks/useDocumentTitle.js)
   Sets route-level document titles consistently.
-- [ModalCard.jsx](/C:/Users/PC/cocoa-inventory/src/Component/ui/ModalCard.jsx)
+- [ModalCard.jsx](/C:/Users/PC/inventory-system/src/Component/ui/ModalCard.jsx)
   Handles dialog focus entry, focus trapping, escape-to-close, and focus return.
-- [StateNotice.jsx](/C:/Users/PC/cocoa-inventory/src/Component/ui/StateNotice.jsx)
+- [StateNotice.jsx](/C:/Users/PC/inventory-system/src/Component/ui/StateNotice.jsx)
   Provides shared status and error announcements with live-region semantics.
-- [styles.css](/C:/Users/PC/cocoa-inventory/src/styles.css)
+- [styles.css](/C:/Users/PC/inventory-system/src/styles.css)
   Includes helper classes such as `.skip-link`, `.field-help`, and `.sr-only`.
 
 ## Working guidance

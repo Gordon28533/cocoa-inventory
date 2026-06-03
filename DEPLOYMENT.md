@@ -2,8 +2,8 @@
 
 This guide reflects the current application layout and startup flow in:
 
-- [Backend/server.js](/C:/Users/PC/cocoa-inventory/Backend/server.js)
-- [Backend/app.js](/C:/Users/PC/cocoa-inventory/Backend/app.js)
+- [Backend/server.js](/C:/Users/PC/inventory-system/Backend/server.js)
+- [Backend/app.js](/C:/Users/PC/inventory-system/Backend/app.js)
 
 ## What gets deployed
 
@@ -25,8 +25,8 @@ The backend serves the frontend build in production.
 ## 1. Copy the project
 
 ```bash
-git clone <your-repo-url> /opt/cocoa-inventory
-cd /opt/cocoa-inventory
+git clone <your-repo-url> /opt/inventory-system
+cd /opt/inventory-system
 ```
 
 ## 2. Install dependencies
@@ -39,7 +39,7 @@ There is a single root `package.json`. You do not need a separate `npm install` 
 
 ## 3. Configure environment variables
 
-Create `/opt/cocoa-inventory/.env`:
+Create `/opt/inventory-system/.env`:
 
 ```env
 DB_HOST=127.0.0.1
@@ -56,7 +56,7 @@ Notes:
 - `Backend/server.js` loads `.env` from the project root.
 - Use a strong `JWT_SECRET`.
 - In production, point these values at your managed MySQL instance. Do not use the local Windows dev bootstrap flow.
-- Start from [.env.example](/C:/Users/PC/cocoa-inventory/.env.example) when creating the file.
+- Start from [.env.example](/C:/Users/PC/inventory-system/.env.example) when creating the file.
 
 ## 4. Prepare the database
 
@@ -73,8 +73,8 @@ Then import your schema and seed strategy.
 
 Recommended options:
 
-- use [init-prod-db.sql](/C:/Users/PC/cocoa-inventory/scripts/init-prod-db.sql) for a production-safe bootstrap
-- use [init-dev-db.sql](/C:/Users/PC/cocoa-inventory/scripts/init-dev-db.sql) only as a development reference
+- use [init-prod-db.sql](/C:/Users/PC/inventory-system/scripts/init-prod-db.sql) for a production-safe bootstrap
+- use [init-dev-db.sql](/C:/Users/PC/inventory-system/scripts/init-dev-db.sql) only as a development reference
 - or provision schema via your database migration/release process
 
 Important:
@@ -116,7 +116,7 @@ CI=true npm test -- --watch=false
 ### With PM2
 
 ```bash
-cd /opt/cocoa-inventory
+cd /opt/inventory-system
 pm2 start ecosystem.config.cjs
 pm2 save
 ```
@@ -125,11 +125,11 @@ Useful PM2 commands:
 
 ```bash
 pm2 status
-pm2 logs cocoa-inventory
-pm2 restart cocoa-inventory
+pm2 logs inventory-system
+pm2 restart inventory-system
 ```
 
-The repository includes a ready-to-use PM2 config in [ecosystem.config.cjs](/C:/Users/PC/cocoa-inventory/ecosystem.config.cjs).
+The repository includes a ready-to-use PM2 config in [ecosystem.config.cjs](/C:/Users/PC/inventory-system/ecosystem.config.cjs).
 
 ## 8. Verify the deployment
 

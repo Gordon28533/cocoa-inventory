@@ -1,7 +1,7 @@
 
 export const connectorConfig = {
   connector: 'default',
-  service: 'cocoa-inventory',
+  service: 'inventory-system',
   location: 'us-central1'
 };
 

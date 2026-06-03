@@ -1,7 +1,7 @@
 module.exports = {
   apps: [
     {
-      name: "cocoa-inventory",
+      name: "inventory-system",
       script: "Backend/server.js",
       cwd: __dirname,
       interpreter: "node",

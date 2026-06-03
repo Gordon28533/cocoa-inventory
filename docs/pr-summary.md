@@ -8,7 +8,7 @@ Refactor backend, centralize frontend auth, and improve local DB/deployment tool
 
 ## Summary
 
-This PR modernizes the Cocoa Inventory project across three main areas:
+This PR modernizes the Inventory System project across three main areas:
 
 - modular backend architecture with deterministic in-process route tests
 - centralized frontend auth/session handling with stronger UI workflow coverage
@@ -35,10 +35,10 @@ This PR modernizes the Cocoa Inventory project across three main areas:
 
 Key files:
 
-- [server.js](/C:/Users/PC/cocoa-inventory/Backend/server.js)
-- [app.js](/C:/Users/PC/cocoa-inventory/Backend/app.js)
-- [routes](/C:/Users/PC/cocoa-inventory/Backend/routes)
-- [lib](/C:/Users/PC/cocoa-inventory/Backend/lib)
+- [server.js](/C:/Users/PC/inventory-system/Backend/server.js)
+- [app.js](/C:/Users/PC/inventory-system/Backend/app.js)
+- [routes](/C:/Users/PC/inventory-system/Backend/routes)
+- [lib](/C:/Users/PC/inventory-system/Backend/lib)
 
 ### Frontend
 
@@ -63,11 +63,11 @@ Key files:
 
 Key files:
 
-- [App.js](/C:/Users/PC/cocoa-inventory/src/App.js)
-- [AuthContext.js](/C:/Users/PC/cocoa-inventory/src/Context/AuthContext.js)
-- [api.js](/C:/Users/PC/cocoa-inventory/src/utils/api.js)
-- [Dashboard.js](/C:/Users/PC/cocoa-inventory/src/Pages/Dashboard.js)
-- [AdminAddUser.js](/C:/Users/PC/cocoa-inventory/src/Pages/AdminAddUser.js)
+- [App.js](/C:/Users/PC/inventory-system/src/App.js)
+- [AuthContext.js](/C:/Users/PC/inventory-system/src/Context/AuthContext.js)
+- [api.js](/C:/Users/PC/inventory-system/src/utils/api.js)
+- [Dashboard.js](/C:/Users/PC/inventory-system/src/Pages/Dashboard.js)
+- [AdminAddUser.js](/C:/Users/PC/inventory-system/src/Pages/AdminAddUser.js)
 
 ### Tooling and operations
 
@@ -81,13 +81,13 @@ Key files:
 
 Key files:
 
-- [package.json](/C:/Users/PC/cocoa-inventory/package.json)
-- [README.md](/C:/Users/PC/cocoa-inventory/README.md)
-- [DEPLOYMENT.md](/C:/Users/PC/cocoa-inventory/DEPLOYMENT.md)
-- [api-contract.md](/C:/Users/PC/cocoa-inventory/docs/api-contract.md)
-- [init-dev-db.sql](/C:/Users/PC/cocoa-inventory/scripts/init-dev-db.sql)
-- [init-prod-db.sql](/C:/Users/PC/cocoa-inventory/scripts/init-prod-db.sql)
-- [ecosystem.config.cjs](/C:/Users/PC/cocoa-inventory/ecosystem.config.cjs)
+- [package.json](/C:/Users/PC/inventory-system/package.json)
+- [README.md](/C:/Users/PC/inventory-system/README.md)
+- [DEPLOYMENT.md](/C:/Users/PC/inventory-system/DEPLOYMENT.md)
+- [api-contract.md](/C:/Users/PC/inventory-system/docs/api-contract.md)
+- [init-dev-db.sql](/C:/Users/PC/inventory-system/scripts/init-dev-db.sql)
+- [init-prod-db.sql](/C:/Users/PC/inventory-system/scripts/init-prod-db.sql)
+- [ecosystem.config.cjs](/C:/Users/PC/inventory-system/ecosystem.config.cjs)
 
 ## Verification
 

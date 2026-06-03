@@ -98,7 +98,7 @@ const AppContent = () => {
             <div className="header-content">
               <img src="/cmc_logo1.jpg" alt="Cocoa Marketing Company Logo" className="logo" />
               <div className="header-text">
-                <h1>CMC Inventory Control System</h1>
+                <h1>Inventory System</h1>
                 <p>Cocoa Marketing Company</p>
               </div>
               {token && (

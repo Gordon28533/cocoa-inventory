@@ -9,14 +9,20 @@ import {
 import { canManageInventory } from "../lib/roles.js";
 import { ensureRequiredFields, hasText, isNonNegativeNumber } from "../lib/validation.js";
 
-export function createInventoryRouter({ getDb, requireAuth, requireDatabase }) {
+export function createInventoryRouter({ getDb, requireAuth, requireDatabase, logAudit }) {
   const router = express.Router();
 
+  // M-6: Accept ?page and ?limit for pagination
   router.get("/items", requireAuth, requireDatabase, async (req, res) => {
     const db = getDb();
+    const limit  = Math.min(Math.max(parseInt(req.query.limit)  || 100, 1), 500);
+    const offset = Math.max((parseInt(req.query.page) || 1) - 1, 0) * limit;
 
     try {
-      const [rows] = await db.execute("SELECT * FROM inventory ORDER BY name");
+      // L-1: Explicit columns
+      const [rows] = await db.execute(
+        `SELECT id, name, category, type, quantity FROM inventory ORDER BY name LIMIT ${limit} OFFSET ${offset}`
+      );
       res.json(rows);
     } catch (error) {
       logUnexpectedError(console, "Error fetching inventory", error);
@@ -27,6 +33,11 @@ export function createInventoryRouter({ getDb, requireAuth, requireDatabase }) {
   router.post("/items", requireAuth, requireDatabase, async (req, res) => {
     const db = getDb();
     const { id, name, category, type, quantity } = req.body;
+
+    if (!canManageInventory(req.user)) {
+      return forbidden(res, "Not authorized to add items");
+    }
+
     const missingFieldError = ensureRequiredFields({
       "Item ID": id,
       Name: name,
@@ -34,12 +45,16 @@ export function createInventoryRouter({ getDb, requireAuth, requireDatabase }) {
       Type: type
     });
 
-    if (!canManageInventory(req.user)) {
-      return forbidden(res, "Not authorized to add items");
-    }
-
-    if (missingFieldError || !isNonNegativeNumber(quantity) || !hasText(id) || !hasText(name) || !hasText(category) || !hasText(type)) {
-      return badRequest(res, "Invalid item data");
+    // M-7: Apply length caps matching the schema (id VARCHAR(50), name/category/type VARCHAR(100))
+    if (
+      missingFieldError ||
+      !isNonNegativeNumber(quantity) ||
+      !hasText(id, 50) ||
+      !hasText(name, 100) ||
+      !hasText(category, 100) ||
+      !hasText(type, 100)
+    ) {
+      return badRequest(res, missingFieldError || "Invalid item data");
     }
 
     try {
@@ -47,7 +62,22 @@ export function createInventoryRouter({ getDb, requireAuth, requireDatabase }) {
         "INSERT INTO inventory (id, name, category, type, quantity) VALUES (?, ?, ?, ?, ?)",
         [id.trim(), name.trim(), category.trim(), type.trim(), quantity]
       );
-      res.status(201).json({ id: id.trim(), name: name.trim(), category: category.trim(), type: type.trim(), quantity });
+
+      // H-5: Audit inventory creation
+      await logAudit(
+        req.user.id,
+        "create_item",
+        id.trim(),
+        JSON.stringify({ name: name.trim(), category: category.trim(), quantity })
+      );
+
+      res.status(201).json({
+        id: id.trim(),
+        name: name.trim(),
+        category: category.trim(),
+        type: type.trim(),
+        quantity
+      });
     } catch (error) {
       logUnexpectedError(console, "Error adding item", error);
       return serverError(res, "Failed to add item");
@@ -59,7 +89,7 @@ export function createInventoryRouter({ getDb, requireAuth, requireDatabase }) {
     const { id } = req.params;
     const { quantity } = req.body;
 
-    if (!hasText(id)) {
+    if (!hasText(id, 50)) {
       return badRequest(res, "Invalid item ID");
     }
 
@@ -73,6 +103,10 @@ export function createInventoryRouter({ getDb, requireAuth, requireDatabase }) {
 
     try {
       await db.execute("UPDATE inventory SET quantity = ? WHERE id = ?", [quantity, id.trim()]);
+
+      // H-5: Audit inventory update
+      await logAudit(req.user.id, "update_item", id.trim(), JSON.stringify({ quantity }));
+
       res.json({ success: true, message: "Item updated successfully" });
     } catch (error) {
       logUnexpectedError(console, "Error updating item", error);
@@ -84,7 +118,7 @@ export function createInventoryRouter({ getDb, requireAuth, requireDatabase }) {
     const db = getDb();
     const { id } = req.params;
 
-    if (!hasText(id)) {
+    if (!hasText(id, 50)) {
       return badRequest(res, "Invalid item ID");
     }
 
@@ -94,6 +128,10 @@ export function createInventoryRouter({ getDb, requireAuth, requireDatabase }) {
 
     try {
       await db.execute("DELETE FROM inventory WHERE id = ?", [id.trim()]);
+
+      // H-5: Audit inventory deletion
+      await logAudit(req.user.id, "delete_item", id.trim());
+
       res.json({ success: true, message: "Item deleted successfully" });
     } catch (error) {
       if (isForeignKeyConstraintError(error)) {

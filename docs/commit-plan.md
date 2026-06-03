@@ -111,7 +111,7 @@ Suggested files:
 .gitignore
 .vscode/launch.json
 .vscode/settings.json
-cocoa-inventory.code-workspace
+inventory-system.code-workspace
 README.md
 DEPLOYMENT.md
 docs/api-contract.md

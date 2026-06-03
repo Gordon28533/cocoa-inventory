@@ -1,8 +1,8 @@
 @echo off
-REM Cocoa Inventory System - Windows Deployment Script
+REM Inventory System - Windows Deployment Script
 REM Run this script from the project root directory
 
-echo 🚀 Starting Cocoa Inventory deployment...
+echo 🚀 Starting Inventory System deployment...
 
 REM Check if we're in the right directory
 if not exist "package.json" (
@@ -41,13 +41,13 @@ if errorlevel 1 (
 
 REM Stop existing PM2 process if running
 echo 🛑 Stopping existing processes...
-pm2 stop cocoa-backend 2>nul
-pm2 delete cocoa-backend 2>nul
+pm2 stop inventory-backend 2>nul
+pm2 delete inventory-backend 2>nul
 
 REM Start backend with PM2
 echo 🚀 Starting backend with PM2...
 cd Backend
-call pm2 start server.js --name cocoa-backend --env production
+call pm2 start server.js --name inventory-backend --env production
 cd ..
 
 REM Save PM2 configuration
@@ -60,7 +60,7 @@ call pm2 status
 
 echo ✅ Deployment completed successfully!
 echo 🌐 Your application should be running on http://localhost:5000
-echo 📋 Use 'pm2 logs cocoa-backend' to view logs
-echo 📋 Use 'pm2 restart cocoa-backend' to restart the application
+echo 📋 Use 'pm2 logs inventory-backend' to view logs
+echo 📋 Use 'pm2 restart inventory-backend' to restart the application
 
 pause 

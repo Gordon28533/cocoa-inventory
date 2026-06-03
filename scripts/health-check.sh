@@ -2,9 +2,9 @@
 
 set -euo pipefail
 
-APP_NAME="${APP_NAME:-cocoa-inventory}"
+APP_NAME="${APP_NAME:-inventory-system}"
 APP_URL="${APP_URL:-http://127.0.0.1:5000}"
-LOG_FILE="${LOG_FILE:-/var/log/cocoa-inventory-health.log}"
+LOG_FILE="${LOG_FILE:-/var/log/inventory-system-health.log}"
 SMOKE_STAFF_NAME="${SMOKE_STAFF_NAME:-}"
 SMOKE_PASSWORD="${SMOKE_PASSWORD:-}"
 

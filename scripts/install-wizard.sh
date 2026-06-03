@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-echo "Cocoa Inventory installation helper"
+echo "Inventory System installation helper"
 echo
 echo "This project now uses a single root package.json and a PM2 ecosystem file."
 echo "The fastest production path is:"

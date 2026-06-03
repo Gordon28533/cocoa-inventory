@@ -7,44 +7,45 @@ import { useAuth } from "../Context/AuthContext.js";
 import StateNotice from "./ui/StateNotice.jsx";
 import { api } from "../utils/api.js";
 
-const EMPTY_ITEM = {
-  id: "",
-  name: "",
-  category: "",
-  type: "",
-  quantity: 0
-};
+const EMPTY_ITEM = { id: "", name: "", category: "", type: "", quantity: 0 };
 
 const normalizeItem = (item = {}) => ({
-  id: item.id || "",
-  name: item.name || "",
+  id:       item.id       || "",
+  name:     item.name     || "",
   category: item.category || "",
-  type: item.type || "",
+  type:     item.type     || "",
   quantity: Number(item.quantity) || 0
 });
 
+/**
+ * @param {boolean} showPreview  L-3: Opt-in preview panel. Defaults to false to
+ *                               avoid fetching inventory on every add-mode mount.
+ */
 const InventoryForm = ({
-  setInventory = undefined,
-  initialItem = null,
-  onSubmit = undefined,
-  onCancel = undefined,
-  isEdit = false
+  setInventory   = undefined,
+  initialItem    = null,
+  onSubmit       = undefined,
+  onCancel       = undefined,
+  isEdit         = false,
+  showPreview    = false
 }) => {
   const { token } = useAuth();
-  const [item, setItem] = useState(() => normalizeItem(initialItem || EMPTY_ITEM));
+  const [item, setItem]             = useState(() => normalizeItem(initialItem || EMPTY_ITEM));
   const [fetchedItems, setFetchedItems] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [message, setMessage] = useState("");
+  const [message, setMessage]       = useState("");
+
   const categoryHelpId = "inventory-form-category-help";
   const quantityHelpId = "inventory-form-quantity-help";
-  const messageId = message ? "inventory-form-message" : undefined;
+  const messageId      = message ? "inventory-form-message" : undefined;
 
   useEffect(() => {
     setItem(normalizeItem(initialItem || EMPTY_ITEM));
   }, [initialItem]);
 
+  // L-3: Only fetch the preview list when the caller explicitly opts in
   useEffect(() => {
-    if (!token || isEdit) {
+    if (!token || isEdit || !showPreview) {
       setFetchedItems([]);
       return;
     }
@@ -54,30 +55,28 @@ const InventoryForm = ({
     const fetchItems = async () => {
       try {
         const data = await api.getItems();
-
-        if (isMounted) {
-          setFetchedItems(Array.isArray(data) ? data : []);
-        }
+        if (isMounted) setFetchedItems(Array.isArray(data) ? data : []);
       } catch (error) {
-        if (isMounted) {
-          setFetchedItems([]);
-        }
-
+        if (isMounted) setFetchedItems([]);
         console.error("Error fetching items:", error);
       }
     };
 
     fetchItems();
+    return () => { isMounted = false; };
+  }, [isEdit, showPreview, token]);
 
-    return () => {
-      isMounted = false;
-    };
-  }, [isEdit, token]);
+  // M-3: Clear the auto-dismiss timer when the component unmounts
+  useEffect(() => {
+    if (!message.toLowerCase().includes("success")) return;
+    const id = setTimeout(() => setMessage(""), 3000);
+    return () => clearTimeout(id);
+  }, [message]);
 
   const stockOptions = useMemo(() => {
-    if (item.category === "Toner Stock") return tonerStock;
+    if (item.category === "Toner Stock")     return tonerStock;
     if (item.category === "Stationery Stock") return stationeryStock;
-    if (item.category === "General Stock") return generalStock;
+    if (item.category === "General Stock")   return generalStock;
     return [];
   }, [item.category]);
 
@@ -103,7 +102,7 @@ const InventoryForm = ({
         setInventory?.((previous) => [...previous, newItem]);
         setMessage("Item added successfully!");
         setItem(normalizeItem(EMPTY_ITEM));
-        window.setTimeout(() => setMessage(""), 3000);
+        // Note: the auto-dismiss effect above handles clearing the message
       }
     } catch (error) {
       setMessage(error.message || "Network error. Please check your connection.");
@@ -133,7 +132,7 @@ const InventoryForm = ({
               onChange={(event) => setItem((current) => ({
                 ...current,
                 category: event.target.value,
-                id: isEdit ? current.id : "",
+                id:   isEdit ? current.id   : "",
                 name: isEdit ? current.name : ""
               }))}
               required
@@ -159,10 +158,10 @@ const InventoryForm = ({
                 id="itemId"
                 value={item.id}
                 onChange={(event) => {
-                  const selected = stockOptions.find((stockItem) => stockItem.id === event.target.value);
+                  const selected = stockOptions.find((s) => s.id === event.target.value);
                   setItem((current) => ({
                     ...current,
-                    id: selected ? selected.id : "",
+                    id:   selected ? selected.id   : "",
                     name: selected ? selected.name : ""
                   }));
                 }}
@@ -170,10 +169,8 @@ const InventoryForm = ({
                 disabled={isSubmitting || !item.category}
               >
                 <option value="">Select Item ID</option>
-                {stockOptions.map((stockItem) => (
-                  <option key={stockItem.id} value={stockItem.id}>
-                    {stockItem.id} - {stockItem.name}
-                  </option>
+                {stockOptions.map((s) => (
+                  <option key={s.id} value={s.id}>{s.id} - {s.name}</option>
                 ))}
               </select>
             )}
@@ -229,8 +226,12 @@ const InventoryForm = ({
         </div>
 
         <div className="modal-actions inventory-form__actions">
-          <button type="submit" className="btn btn-primary inventory-form__action-button" disabled={isSubmitting}>
-            {isSubmitting ? (isEdit ? "Saving..." : "Adding Item...") : isEdit ? "Save Changes" : "Add Item"}
+          <button
+            type="submit"
+            className="btn btn-primary inventory-form__action-button"
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? (isEdit ? "Saving…" : "Adding Item…") : isEdit ? "Save Changes" : "Add Item"}
           </button>
 
           <button
@@ -244,7 +245,7 @@ const InventoryForm = ({
         </div>
       </form>
 
-      {!isEdit && fetchedItems.length > 0 && (
+      {!isEdit && showPreview && fetchedItems.length > 0 && (
         <section className="inventory-preview" aria-label="Current inventory preview">
           <h4 className="inventory-preview__title">Current Inventory Items ({fetchedItems.length})</h4>
           <div className="inventory-preview__grid">
@@ -270,10 +271,11 @@ const InventoryForm = ({
 
 InventoryForm.propTypes = {
   setInventory: PropTypes.func,
-  initialItem: PropTypes.object,
-  onSubmit: PropTypes.func,
-  onCancel: PropTypes.func,
-  isEdit: PropTypes.bool
+  initialItem:  PropTypes.object,
+  onSubmit:     PropTypes.func,
+  onCancel:     PropTypes.func,
+  isEdit:       PropTypes.bool,
+  showPreview:  PropTypes.bool
 };
 
 export default InventoryForm;

@@ -19,32 +19,58 @@ export function createBackendApp({
   databaseManager = createDatabaseManager({ env, logger }),
   rateLimiter = createRateLimiter({ env })
 } = {}) {
+  // C-2: Refuse to start with an insecure JWT secret
+  const jwtSecret = env.JWT_SECRET;
+  if (!jwtSecret) {
+    throw new Error("FATAL: JWT_SECRET environment variable is not set. Refusing to start.");
+  }
+
   const app = express();
-  const jwtSecret = env.JWT_SECRET || "fallback_secret_key_change_in_production";
   const { getDb, getDatabaseStatus, requireDatabase } = databaseManager;
   const { loginAttempts, rateLimit } = rateLimiter;
   const logAudit = createAuditLogger({ getDb, logger });
 
+  // C-4: CORS origin must be configured explicitly in production
+  const corsOrigin =
+    env.NODE_ENV === "production"
+      ? (env.CORS_ORIGIN || (() => { throw new Error("FATAL: CORS_ORIGIN is not set in production."); })())
+          .split(",")
+          .map((o) => o.trim())
+      : ["http://localhost:3000", "http://localhost:5001", "http://127.0.0.1:3000"];
+
   app.use(
     cors({
-      origin:
-        env.NODE_ENV === "production"
-          ? ["https://yourdomain.com", "https://www.yourdomain.com"]
-          : ["http://localhost:3000", "http://localhost:5001", "http://127.0.0.1:3000"],
+      origin: corsOrigin,
       credentials: true,
-      methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+      methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
       allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"]
     })
   );
+
   app.use(express.json({ limit: "10mb" }));
+
+  // H-4: Configure a real CSP instead of disabling it
   app.use(
     helmet({
-      contentSecurityPolicy: false,
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: ["'self'"],
+          scriptSrc:  ["'self'"],
+          styleSrc:   ["'self'", "'unsafe-inline'"],
+          imgSrc:     ["'self'", "data:"],
+          connectSrc: ["'self'"],
+          fontSrc:    ["'self'"],
+          objectSrc:  ["'none'"],
+          frameAncestors: ["'none'"]
+        }
+      },
       crossOriginEmbedderPolicy: false
     })
   );
+
+  // M-8: Use structured log format in production, colorised dev format locally
   app.use(
-    morgan("dev", {
+    morgan(env.NODE_ENV === "production" ? "combined" : "dev", {
       skip: () => env.NODE_ENV === "test"
     })
   );
@@ -53,10 +79,7 @@ export function createBackendApp({
     app.use(express.static(buildDir));
   }
 
-  const { requireAuth, requireAdmin } = createAuthMiddleware({
-    getDb,
-    jwtSecret
-  });
+  const { requireAuth, requireAdmin } = createAuthMiddleware({ getDb, jwtSecret });
 
   app.get("/health", (req, res) => {
     res.json({
@@ -78,26 +101,30 @@ export function createBackendApp({
       rateLimit,
       requireAuth,
       requireAdmin,
-      requireDatabase
+      requireDatabase,
+      logAudit
     })
   );
   app.use(
     createUserRouter({
       getDb,
       requireAdmin,
-      requireDatabase
+      requireDatabase,
+      logAudit
     })
   );
   app.use(
     createInventoryRouter({
       getDb,
       requireAuth,
-      requireDatabase
+      requireDatabase,
+      logAudit
     })
   );
   app.use(
     createDepartmentRouter({
       getDb,
+      requireAuth,
       requireAdmin,
       requireDatabase
     })

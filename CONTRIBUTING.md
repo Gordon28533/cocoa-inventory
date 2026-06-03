@@ -1,6 +1,6 @@
-# Contributing to Cocoa Inventory Management System
+# Contributing to Inventory System
 
-Thank you for considering contributing to the Cocoa Inventory Management System! This document provides guidelines and instructions for contributing to this project.
+Thank you for considering contributing to the Inventory System! This document provides guidelines and instructions for contributing to this project.
 
 ## Code of Conduct
 

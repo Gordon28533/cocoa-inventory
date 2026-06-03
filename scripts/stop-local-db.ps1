@@ -1,13 +1,13 @@
 $ErrorActionPreference = 'SilentlyContinue'
 
-$mysqlBase = Join-Path $env:LOCALAPPDATA 'cocoa-inventory-mysql'
+$mysqlBase = Join-Path $env:LOCALAPPDATA 'inventory-system-mysql'
 $dataDir = Join-Path $mysqlBase 'data'
 $configPath = Join-Path $mysqlBase 'my.ini'
 $targets = Get-CimInstance Win32_Process | Where-Object {
   $_.Name -eq 'mysqld.exe' -and (
     $_.CommandLine -like "*$dataDir*" -or
     $_.CommandLine -like "*$configPath*" -or
-    $_.CommandLine -like '*cocoa-inventory-mysql*'
+    $_.CommandLine -like '*inventory-system-mysql*'
   )
 }
 

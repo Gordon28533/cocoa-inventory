@@ -43,9 +43,9 @@ This release delivers a major project cleanup across backend architecture, front
 
 ## Deployment notes
 
-- use [init-prod-db.sql](/C:/Users/PC/cocoa-inventory/scripts/init-prod-db.sql) for production schema setup
-- use [ecosystem.config.cjs](/C:/Users/PC/cocoa-inventory/ecosystem.config.cjs) to run the backend with PM2
-- use [smoke-startup.mjs](/C:/Users/PC/cocoa-inventory/scripts/smoke-startup.mjs) after deploy for a quick `/health` and optional login verification
+- use [init-prod-db.sql](/C:/Users/PC/inventory-system/scripts/init-prod-db.sql) for production schema setup
+- use [ecosystem.config.cjs](/C:/Users/PC/inventory-system/ecosystem.config.cjs) to run the backend with PM2
+- use [smoke-startup.mjs](/C:/Users/PC/inventory-system/scripts/smoke-startup.mjs) after deploy for a quick `/health` and optional login verification
 
 ## Known note
 

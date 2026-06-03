@@ -1,5 +1,5 @@
 {
-  "name": "cocoa-inventory",
+  "name": "inventory-system",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -14,7 +14,6 @@
     "express": "^4.18.2",
     "helmet": "^7.0.0",
     "jsonwebtoken": "^9.0.2",
-    "mongoose": "^7.5.0",
     "morgan": "^1.10.0",
     "mysql2": "^3.6.0",
     "prop-types": "^15.8.1",

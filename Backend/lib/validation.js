@@ -1,5 +1,9 @@
-export function hasText(value) {
-  return typeof value === "string" && value.trim() !== "";
+export function hasText(value, max = 255) {
+  return (
+    typeof value === "string" &&
+    value.trim() !== "" &&
+    value.length <= max
+  );
 }
 
 export function isPositiveNumber(value) {
@@ -42,5 +46,13 @@ export function ensureRequiredFields(fields) {
     }
   }
 
+  return null;
+}
+
+/** H-6: Minimum password complexity rule used in both change-password and user creation. */
+export function validatePassword(password) {
+  if (!password || typeof password !== "string") return "Password is required";
+  if (password.length < 8) return "Password must be at least 8 characters";
+  if (password.length > 128) return "Password must be at most 128 characters";
   return null;
 }

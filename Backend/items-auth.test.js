@@ -50,12 +50,12 @@ describe("/items auth flow", () => {
     const token = createTestToken({ id: 11, role: "user" });
     const db = createMockDb({
       async execute(sql, params) {
-        if (sql.includes("SELECT isActive FROM users WHERE id = ?")) {
+        if (sql.includes("SELECT isActive, role, department_id FROM users WHERE id = ?")) {
           assert.equal(params[0], 11);
           return [[{ isActive: 1 }]];
         }
 
-        if (sql.includes("SELECT * FROM inventory ORDER BY name")) {
+        if (sql.includes("FROM inventory ORDER BY name")) {
           return [[{ id: "INV-1", name: "Mouse", category: "Peripherals", type: "IT", quantity: 12 }]];
         }
 

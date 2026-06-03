@@ -5,16 +5,20 @@ import {
   logUnexpectedError,
   serverError
 } from "../lib/httpResponses.js";
-import { ensureRequiredFields, parsePositiveInteger } from "../lib/validation.js";
+import { ensureRequiredFields, hasText, parsePositiveInteger } from "../lib/validation.js";
 
-export function createDepartmentRouter({ getDb, requireAdmin, requireDatabase }) {
+export function createDepartmentRouter({ getDb, requireAuth, requireAdmin, requireDatabase }) {
   const router = express.Router();
 
-  router.get("/departments", requireDatabase, async (req, res) => {
+  // C-3: requireAuth added — unauthenticated callers must not enumerate departments
+  router.get("/departments", requireAuth, requireDatabase, async (req, res) => {
     const db = getDb();
 
     try {
-      const [rows] = await db.execute("SELECT * FROM departments ORDER BY name");
+      // L-1: Explicit columns
+      const [rows] = await db.execute(
+        "SELECT id, name, description, is_head_office FROM departments ORDER BY name"
+      );
       res.json(rows);
     } catch (error) {
       logUnexpectedError(console, "Error fetching departments", error);
@@ -25,8 +29,13 @@ export function createDepartmentRouter({ getDb, requireAdmin, requireDatabase })
   router.post("/departments", requireAdmin, requireDatabase, async (req, res) => {
     const db = getDb();
     const { name, description } = req.body;
-    const missingFieldError = ensureRequiredFields({ "Department name": name });
 
+    // M-7: Length cap at schema column size (name VARCHAR(100))
+    if (!hasText(name, 100)) {
+      return badRequest(res, "Department name is required and must be 100 characters or fewer");
+    }
+
+    const missingFieldError = ensureRequiredFields({ "Department name": name });
     if (missingFieldError) {
       return badRequest(res, missingFieldError);
     }
@@ -34,14 +43,15 @@ export function createDepartmentRouter({ getDb, requireAdmin, requireDatabase })
     try {
       const [result] = await db.execute(
         "INSERT INTO departments (name, description) VALUES (?, ?)",
-        [name, description || null]
+        [name.trim(), description || null]
       );
 
       res.status(201).json({
         success: true,
         id: result.insertId,
-        name,
+        name: name.trim(),
         description: description || null,
+        is_head_office: 0,
         message: "Department created successfully"
       });
     } catch (error) {
@@ -58,22 +68,26 @@ export function createDepartmentRouter({ getDb, requireAdmin, requireDatabase })
     const { id } = req.params;
     const { name, description } = req.body;
     const departmentId = parsePositiveInteger(id);
-    const missingFieldError = ensureRequiredFields({ "Department name": name });
 
     if (!departmentId) {
       return badRequest(res, "Invalid department ID");
     }
 
+    // M-7: Length cap
+    if (!hasText(name, 100)) {
+      return badRequest(res, "Department name is required and must be 100 characters or fewer");
+    }
+
+    const missingFieldError = ensureRequiredFields({ "Department name": name });
     if (missingFieldError) {
       return badRequest(res, missingFieldError);
     }
 
     try {
-      await db.execute("UPDATE departments SET name = ?, description = ? WHERE id = ?", [
-        name,
-        description || null,
-        departmentId
-      ]);
+      await db.execute(
+        "UPDATE departments SET name = ?, description = ? WHERE id = ?",
+        [name.trim(), description || null, departmentId]
+      );
       res.json({ success: true, message: "Department updated successfully" });
     } catch (error) {
       logUnexpectedError(console, "Error updating department", error, { ignore: [isDuplicateEntryError] });

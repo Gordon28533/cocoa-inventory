@@ -41,10 +41,20 @@ export function createMockDb({ execute, query } = {}) {
   const executeHandler = execute || (async () => [[]]);
   const queryHandler = query || executeHandler;
 
-  return {
+  const mock = {
     execute: executeHandler,
-    query: queryHandler
+    query: queryHandler,
+    async beginTransaction() {},
+    async commit() {},
+    async rollback() {},
+    // C-1: pool path in withTransaction calls getConnection() — return self so the
+    //      same mock methods are used for both pool and connection code paths
+    async getConnection() {
+      return { ...mock, release() {} };
+    }
   };
+
+  return mock;
 }
 
 export function createTestToken(payload = {}, secret = "test-secret") {

@@ -15,22 +15,37 @@ export function createAuthMiddleware({ getDb, jwtSecret }) {
     return { token };
   }
 
-  async function ensureUserIsActive(userId, logLabel) {
+  /**
+   * Loads the user's live isActive, role, and department_id from the DB.
+   * Returns { status, body } on error, or { liveRole, liveDepartmentId } on success.
+   * H-1: role and department_id come from the DB, not the JWT, so changes take effect immediately.
+   */
+  async function loadLiveUser(userId, logLabel) {
     const db = getDb();
-    if (!db || !userId) {
-      return null;
-    }
+    if (!db || !userId) return null;
 
     try {
-      const [[user]] = await db.execute("SELECT isActive FROM users WHERE id = ?", [userId]);
-      if (user && (user.isActive === 0 || user.isActive === false)) {
+      const [[user]] = await db.execute(
+        "SELECT isActive, role, department_id FROM users WHERE id = ?",
+        [userId]
+      );
+
+      if (!user) {
+        return { status: 403, body: { error: "User not found" } };
+      }
+
+      if (user.isActive === 0 || user.isActive === false) {
         return { status: 403, body: { error: "User account is deactivated" } };
       }
-    } catch (error) {
-      console.error(`${logLabel} active user check failed:`, error.message);
-    }
 
-    return null;
+      return {
+        liveRole: user.role,
+        liveDepartmentId: user.department_id
+      };
+    } catch (error) {
+      console.error(`${logLabel} user check failed:`, error.message);
+      return null; // fail-open on DB error so a transient glitch doesn't lock everyone out
+    }
   }
 
   function sendJwtError(res, err) {
@@ -55,14 +70,20 @@ export function createAuthMiddleware({ getDb, jwtSecret }) {
 
     try {
       const decoded = jwt.verify(token, jwtSecret);
-      const inactiveResponse = await ensureUserIsActive(decoded?.id, logLabel);
-      if (inactiveResponse) {
-        res.status(inactiveResponse.status).json(inactiveResponse.body);
+
+      const result = await loadLiveUser(decoded?.id, logLabel);
+
+      if (result?.status) {
+        res.status(result.status).json(result.body);
         return null;
       }
 
-      req.user = decoded;
-      return decoded;
+      // Apply live role/department from DB so stale JWT claims don't persist (H-1)
+      req.user = { ...decoded };
+      if (result?.liveRole !== undefined)       req.user.role          = result.liveRole;
+      if (result?.liveDepartmentId !== undefined) req.user.department_id = result.liveDepartmentId;
+
+      return req.user;
     } catch (err) {
       sendJwtError(res, err);
       return null;
@@ -71,18 +92,13 @@ export function createAuthMiddleware({ getDb, jwtSecret }) {
 
   async function requireAuth(req, res, next) {
     const user = await authenticateRequest(req, res, { logLabel: "Auth" });
-    if (!user) {
-      return;
-    }
-
+    if (!user) return;
     next();
   }
 
   async function requireAdmin(req, res, next) {
     const user = await authenticateRequest(req, res, { logLabel: "Admin auth" });
-    if (!user) {
-      return;
-    }
+    if (!user) return;
 
     if (user.role !== "admin") {
       return res.status(403).json({ error: "Admin access required" });

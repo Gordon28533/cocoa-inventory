@@ -17,12 +17,19 @@ function authHeaders(token) {
 
 describe("/departments routes", () => {
   it("lists departments when the database is connected", async () => {
+    // C-3: GET /departments now requires authentication
+    const token = createTestToken({ id: 7, role: "user", department_id: 1 });
     const db = createMockDb({
-      async execute(sql) {
-        if (sql.includes("SELECT * FROM departments ORDER BY name")) {
+      async execute(sql, params) {
+        if (sql.includes("SELECT isActive, role, department_id FROM users WHERE id = ?")) {
+          assert.equal(params[0], 7);
+          return [[{ isActive: 1, role: "user", department_id: 1 }]];
+        }
+
+        if (sql.includes("FROM departments ORDER BY name")) {
           return [[
-            { id: 1, name: "Accounts", description: "Finance team" },
-            { id: 2, name: "IT", description: "Technology team" }
+            { id: 1, name: "Accounts", description: "Finance team", is_head_office: 0 },
+            { id: 2, name: "IT", description: "Technology team", is_head_office: 0 }
           ]];
         }
 
@@ -33,7 +40,9 @@ describe("/departments routes", () => {
     await withTestApp(
       { databaseManager: createMockDatabaseManager({ db }) },
       async ({ baseUrl }) => {
-        const { response, data } = await fetchJson(baseUrl, "/departments");
+        const { response, data } = await fetchJson(baseUrl, "/departments", {
+          headers: { Authorization: `Bearer ${token}` }
+        });
 
         assert.equal(response.status, 200);
         assert.equal(data.length, 2);
@@ -46,7 +55,7 @@ describe("/departments routes", () => {
     const token = createTestToken({ id: 4, role: "admin" });
     const db = createMockDb({
       async execute(sql, params) {
-        if (sql.includes("SELECT isActive FROM users WHERE id = ?")) {
+        if (sql.includes("SELECT isActive, role, department_id FROM users WHERE id = ?")) {
           assert.equal(params[0], 4);
           return [[{ isActive: 1 }]];
         }
@@ -78,7 +87,7 @@ describe("/departments routes", () => {
     const token = createTestToken({ id: 4, role: "admin" });
     const db = createMockDb({
       async execute(sql, params) {
-        if (sql.includes("SELECT isActive FROM users WHERE id = ?")) {
+        if (sql.includes("SELECT isActive, role, department_id FROM users WHERE id = ?")) {
           assert.equal(params[0], 4);
           return [[{ isActive: 1 }]];
         }
@@ -106,7 +115,7 @@ describe("/departments routes", () => {
     const token = createTestToken({ id: 4, role: "admin" });
     const db = createMockDb({
       async execute(sql, params) {
-        if (sql.includes("SELECT isActive FROM users WHERE id = ?")) {
+        if (sql.includes("SELECT isActive, role, department_id FROM users WHERE id = ?")) {
           assert.equal(params[0], 4);
           return [[{ isActive: 1 }]];
         }

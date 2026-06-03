@@ -2,8 +2,8 @@
 
 set -euo pipefail
 
-BACKUP_DIR="${BACKUP_DIR:-/opt/backups/cocoa-inventory}"
-APP_DIR="${APP_DIR:-/opt/cocoa-inventory}"
+BACKUP_DIR="${BACKUP_DIR:-/opt/backups/inventory-system}"
+APP_DIR="${APP_DIR:-/opt/inventory-system}"
 DB_NAME="${DB_NAME:-CMC_Inventory}"
 DB_USER="${DB_USER:-cocoa_user}"
 DB_PASS="${DB_PASS:-your_secure_password}"

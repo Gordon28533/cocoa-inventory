@@ -1,5 +1,5 @@
 specVersion: "v1beta"
-serviceId: "cocoa-inventory"
+serviceId: "inventory-system"
 location: "us-central1"
 schema:
   source: "./schema"
@@ -7,6 +7,6 @@ schema:
     postgresql:
       database: "fdcdb"
       cloudSql:
-        instanceId: "cocoa-inventory-fdc"
+        instanceId: "inventory-system-fdc"
       # schemaValidation: "COMPATIBLE"
 connectorDirs: ["./connector"]

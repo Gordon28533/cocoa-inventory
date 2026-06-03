@@ -13,7 +13,7 @@ describe("/login endpoint", () => {
   it("rejects invalid credentials", async () => {
     const db = createMockDb({
       async execute(sql, params) {
-        if (sql.includes("SELECT * FROM users WHERE staffName = ?")) {
+        if (sql.includes("FROM users WHERE staffName = ?")) {
           assert.equal(params[0], "wronguser");
           return [[]];
         }
@@ -44,7 +44,7 @@ describe("/login endpoint", () => {
     const passwordHash = await bcrypt.hash("correctpass", 10);
     const db = createMockDb({
       async execute(sql) {
-        if (sql.includes("SELECT * FROM users WHERE staffName = ?")) {
+        if (sql.includes("FROM users WHERE staffName = ?")) {
           return [[{ id: 7, staffName: "admin", password: passwordHash, role: "admin", department_id: 2, isActive: 1 }]];
         }
 
@@ -79,7 +79,7 @@ describe("auth profile routes", () => {
     const token = createTestToken({ id: 14, role: "account_manager", department_id: 3 });
     const db = createMockDb({
       async execute(sql, params) {
-        if (sql.includes("SELECT isActive FROM users WHERE id = ?")) {
+        if (sql.includes("SELECT isActive, role, department_id FROM users WHERE id = ?")) {
           assert.equal(params[0], 14);
           return [[{ isActive: 1 }]];
         }
@@ -120,7 +120,7 @@ describe("auth profile routes", () => {
     const storedHash = await bcrypt.hash("correct-old-password", 10);
     const db = createMockDb({
       async execute(sql, params) {
-        if (sql.includes("SELECT isActive FROM users WHERE id = ?")) {
+        if (sql.includes("SELECT isActive, role, department_id FROM users WHERE id = ?")) {
           assert.equal(params[0], 12);
           return [[{ isActive: 1 }]];
         }
@@ -163,7 +163,7 @@ describe("auth profile routes", () => {
     const updates = [];
     const db = createMockDb({
       async execute(sql, params) {
-        if (sql.includes("SELECT isActive FROM users WHERE id = ?")) {
+        if (sql.includes("SELECT isActive, role, department_id FROM users WHERE id = ?")) {
           assert.equal(params[0], 12);
           return [[{ isActive: 1 }]];
         }

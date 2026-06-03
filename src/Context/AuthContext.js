@@ -138,7 +138,16 @@ export const AuthProvider = ({ children }) => {
         setDepartmentId("");
         setCurrentPathState("/dashboard");
         setStoredCurrentPath("/dashboard");
-        setErrorMsg("Session expired or unauthorized. Please log in again.");
+
+        // M-11: Give deactivated users a clear, accurate message instead of
+        //        the generic "session expired" text
+        const isDeactivated = error?.status === 403 ||
+          (typeof error?.message === "string" && error.message.toLowerCase().includes("deactivated"));
+        setErrorMsg(
+          isDeactivated
+            ? "Your account has been deactivated. Please contact your administrator."
+            : "Session expired or unauthorised. Please log in again."
+        );
       } finally {
         if (isMounted) {
           setIsAuthChecked(true);

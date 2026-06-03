@@ -20,7 +20,7 @@ describe("/requisitions routes", () => {
     const token = createTestToken({ id: 5, role: "hod", department_id: 9 });
     const db = createMockDb({
       async execute(sql, params) {
-        if (sql.includes("SELECT isActive FROM users WHERE id = ?")) {
+        if (sql.includes("SELECT isActive, role, department_id FROM users WHERE id = ?")) {
           assert.equal(params[0], 5);
           return [[{ isActive: 1 }]];
         }
@@ -48,7 +48,7 @@ describe("/requisitions routes", () => {
     const token = createTestToken({ id: 22, role: "user", department_id: 3 });
     const db = createMockDb({
       async execute(sql, params) {
-        if (sql.includes("SELECT isActive FROM users WHERE id = ?")) {
+        if (sql.includes("SELECT isActive, role, department_id FROM users WHERE id = ?")) {
           assert.equal(params[0], 22);
           return [[{ isActive: 1 }]];
         }
@@ -80,9 +80,15 @@ describe("/requisitions routes", () => {
     const token = createTestToken({ id: 22, role: "user", department_id: 3 });
     const db = createMockDb({
       async execute(sql, params) {
-        if (sql.includes("SELECT isActive FROM users WHERE id = ?")) {
+        if (sql.includes("SELECT isActive, role, department_id FROM users WHERE id = ?")) {
           assert.equal(params[0], 22);
           return [[{ isActive: 1 }]];
+        }
+
+        // H-7: When both department and department_id are supplied, the route
+        // now looks up is_head_office from the departments table
+        if (sql.includes("SELECT is_head_office FROM departments WHERE id = ?")) {
+          return [[{ is_head_office: 0 }]];
         }
 
         throw new Error(`Unexpected SQL: ${sql}`);
@@ -112,12 +118,12 @@ describe("/requisitions routes", () => {
     const token = createTestToken({ id: 22, role: "user" });
     const db = createMockDb({
       async execute(sql, params) {
-        if (sql.includes("SELECT isActive FROM users WHERE id = ?")) {
+        if (sql.includes("SELECT isActive, role, department_id FROM users WHERE id = ?")) {
           assert.equal(params[0], 22);
           return [[{ isActive: 1 }]];
         }
 
-        if (sql.includes("SELECT * FROM requisitions WHERE requested_by = ? ORDER BY created_at DESC")) {
+        if (sql.includes("FROM requisitions WHERE requested_by = ?")) {
           assert.deepEqual(params, [22]);
           return [[{ id: 5, requested_by: 22, status: "pending" }]];
         }
@@ -143,12 +149,12 @@ describe("/requisitions routes", () => {
     const token = createTestToken({ id: 9, role: "account_manager", department_id: 4 });
     const db = createMockDb({
       async execute(sql, params) {
-        if (sql.includes("SELECT isActive FROM users WHERE id = ?")) {
+        if (sql.includes("SELECT isActive, role, department_id FROM users WHERE id = ?")) {
           assert.equal(params[0], 9);
           return [[{ isActive: 1 }]];
         }
 
-        if (sql.includes("SELECT * FROM requisitions WHERE batch_id = ?")) {
+        if (sql.includes("FROM requisitions WHERE batch_id = ?")) {
           assert.deepEqual(params, ["batch-1"]);
           return [[
             { id: 1, status: "pending", department_id: 4, department: "Branch" },
@@ -181,12 +187,12 @@ describe("/requisitions routes", () => {
     const auditEntries = [];
     const db = createMockDb({
       async execute(sql, params) {
-        if (sql.includes("SELECT isActive FROM users WHERE id = ?")) {
+        if (sql.includes("SELECT isActive, role, department_id FROM users WHERE id = ?")) {
           assert.equal(params[0], 5);
           return [[{ isActive: 1 }]];
         }
 
-        if (sql.includes("SELECT * FROM requisitions WHERE id = ?")) {
+        if (sql.includes("FROM requisitions WHERE id = ?")) {
           assert.deepEqual(params, [44]);
           return [[{ id: 44, status: "pending", department_id: 9, department: "Operations", is_it_item: 0 }]];
         }
@@ -219,7 +225,7 @@ describe("/requisitions routes", () => {
         assert.equal(updates.length, 1);
         assert.match(updates[0].sql, /hod_approved_by = \?/);
         assert.deepEqual(updates[0].params, ["hod_approved", 5, 44]);
-        assert.deepEqual(auditEntries, [[5, "hod_approve", 44]]);
+        assert.deepEqual(auditEntries, [[5, "hod_approve", "44", null]]);
       }
     );
   });
@@ -230,12 +236,12 @@ describe("/requisitions routes", () => {
     const auditEntries = [];
     const db = createMockDb({
       async execute(sql, params) {
-        if (sql.includes("SELECT isActive FROM users WHERE id = ?")) {
+        if (sql.includes("SELECT isActive, role, department_id FROM users WHERE id = ?")) {
           assert.equal(params[0], 15);
           return [[{ isActive: 1 }]];
         }
 
-        if (sql.includes("SELECT * FROM requisitions WHERE id = ?")) {
+        if (sql.includes("FROM requisitions WHERE id = ?")) {
           assert.deepEqual(params, [55]);
           return [[{ id: 55, status: "pending", department_id: 4, department: "Branch Office", is_it_item: 0 }]];
         }
@@ -268,7 +274,7 @@ describe("/requisitions routes", () => {
         assert.equal(updates.length, 1);
         assert.match(updates[0].sql, /branch_account_approved_by = \?/);
         assert.deepEqual(updates[0].params, ["branch_account_approved", 15, 55]);
-        assert.deepEqual(auditEntries, [[15, "branch_account_approve", 55]]);
+        assert.deepEqual(auditEntries, [[15, "branch_account_approve", "55", null]]);
       }
     );
   });
@@ -279,12 +285,12 @@ describe("/requisitions routes", () => {
     const auditEntries = [];
     const db = createMockDb({
       async execute(sql, params) {
-        if (sql.includes("SELECT isActive FROM users WHERE id = ?")) {
+        if (sql.includes("SELECT isActive, role, department_id FROM users WHERE id = ?")) {
           assert.equal(params[0], 16);
           return [[{ isActive: 1 }]];
         }
 
-        if (sql.includes("SELECT * FROM requisitions WHERE id = ?")) {
+        if (sql.includes("FROM requisitions WHERE id = ?")) {
           assert.deepEqual(params, [56]);
           return [[{ id: 56, status: "hod_approved", department_id: 9, department: "Operations", is_it_item: 1 }]];
         }
@@ -317,7 +323,7 @@ describe("/requisitions routes", () => {
         assert.equal(updates.length, 1);
         assert.match(updates[0].sql, /it_approved_by = \?/);
         assert.deepEqual(updates[0].params, ["it_approved", 16, 56]);
-        assert.deepEqual(auditEntries, [[16, "it_approve", 56]]);
+        assert.deepEqual(auditEntries, [[16, "it_approve", "56", null]]);
       }
     );
   });
@@ -328,12 +334,12 @@ describe("/requisitions routes", () => {
     const auditEntries = [];
     const db = createMockDb({
       async execute(sql, params) {
-        if (sql.includes("SELECT isActive FROM users WHERE id = ?")) {
+        if (sql.includes("SELECT isActive, role, department_id FROM users WHERE id = ?")) {
           assert.equal(params[0], 17);
           return [[{ isActive: 1 }]];
         }
 
-        if (sql.includes("SELECT * FROM requisitions WHERE id = ?")) {
+        if (sql.includes("FROM requisitions WHERE id = ?")) {
           assert.deepEqual(params, [57]);
           return [[{ id: 57, status: "branch_account_approved", department_id: 4, department: "Branch Office", is_it_item: 0 }]];
         }
@@ -366,7 +372,7 @@ describe("/requisitions routes", () => {
         assert.equal(updates.length, 1);
         assert.match(updates[0].sql, /ho_account_approved_by = \?/);
         assert.deepEqual(updates[0].params, ["ho_account_approved", 17, 57]);
-        assert.deepEqual(auditEntries, [[17, "ho_account_approve", 57]]);
+        assert.deepEqual(auditEntries, [[17, "ho_account_approve", "57", null]]);
       }
     );
   });
@@ -377,12 +383,12 @@ describe("/requisitions routes", () => {
     const auditEntries = [];
     const db = createMockDb({
       async execute(sql, params) {
-        if (sql.includes("SELECT isActive FROM users WHERE id = ?")) {
+        if (sql.includes("SELECT isActive, role, department_id FROM users WHERE id = ?")) {
           assert.equal(params[0], 18);
           return [[{ isActive: 1 }]];
         }
 
-        if (sql.includes("SELECT * FROM requisitions WHERE id = ?")) {
+        if (sql.includes("FROM requisitions WHERE id = ?")) {
           assert.deepEqual(params, [58]);
           return [[{ id: 58, status: "it_approved", department_id: 9, department: "Head Office", is_it_item: 1 }]];
         }
@@ -415,7 +421,7 @@ describe("/requisitions routes", () => {
         assert.equal(updates.length, 1);
         assert.match(updates[0].sql, /account_approved_by = \?/);
         assert.deepEqual(updates[0].params, ["account_approved", 18, 58]);
-        assert.deepEqual(auditEntries, [[18, "account_approve", 58]]);
+        assert.deepEqual(auditEntries, [[18, "account_approve", "58", null]]);
       }
     );
   });
@@ -423,20 +429,31 @@ describe("/requisitions routes", () => {
   it("fulfills approved batches for stores with a matching unique code", async () => {
     const token = createTestToken({ id: 8, role: "stores" });
     const updates = [];
+    const inventoryUpdates = [];
     const auditEntries = [];
     const db = createMockDb({
       async execute(sql, params) {
-        if (sql.includes("SELECT isActive FROM users WHERE id = ?")) {
+        if (sql.includes("SELECT isActive, role, department_id FROM users WHERE id = ?")) {
           assert.equal(params[0], 8);
           return [[{ isActive: 1 }]];
         }
 
-        if (sql.includes("SELECT * FROM requisitions WHERE batch_id = ?")) {
+        if (sql.includes("FROM requisitions WHERE batch_id = ?")) {
           assert.deepEqual(params, ["batch-200"]);
           return [[
-            { id: 1, status: "account_approved", unique_code: "ABC123", department: "Branch" },
-            { id: 2, status: "account_approved", unique_code: "ABC123", department: "Branch" }
+            { id: 1, item_id: "INV-1", quantity: 2, status: "account_approved", unique_code: "ABC123", department: "Branch" },
+            { id: 2, item_id: "INV-1", quantity: 1, status: "account_approved", unique_code: "ABC123", department: "Branch" }
           ]];
+        }
+
+        if (sql.includes("SELECT id, quantity FROM inventory WHERE id = ?")) {
+          assert.deepEqual(params, ["INV-1"]);
+          return [[{ id: "INV-1", quantity: 12 }]];
+        }
+
+        if (sql.includes("UPDATE inventory SET quantity = quantity - ? WHERE id = ?")) {
+          inventoryUpdates.push({ sql, params });
+          return [{ affectedRows: 1 }];
         }
 
         if (sql.startsWith("UPDATE requisitions SET")) {
@@ -465,9 +482,51 @@ describe("/requisitions routes", () => {
         assert.equal(response.status, 200);
         assert.equal(data.status, "fulfilled");
         assert.equal(data.batch_id, "batch-200");
+        assert.equal(inventoryUpdates.length, 1);
+        assert.deepEqual(inventoryUpdates[0].params, [3, "INV-1"]);
         assert.equal(updates.length, 1);
         assert.deepEqual(updates[0].params, ["fulfilled", 8, 1, 2]);
-        assert.deepEqual(auditEntries, [[8, "fulfill", "batch-200"]]);
+        assert.deepEqual(auditEntries, [[8, "fulfill", "batch-200", null]]);
+      }
+    );
+  });
+
+  it("rejects fulfillment when inventory stock is insufficient", async () => {
+    const token = createTestToken({ id: 8, role: "stores" });
+    const db = createMockDb({
+      async execute(sql, params) {
+        if (sql.includes("SELECT isActive, role, department_id FROM users WHERE id = ?")) {
+          assert.equal(params[0], 8);
+          return [[{ isActive: 1 }]];
+        }
+
+        if (sql.includes("FROM requisitions WHERE batch_id = ?")) {
+          assert.deepEqual(params, ["batch-201"]);
+          return [[
+            { id: 3, item_id: "INV-2", quantity: 5, status: "account_approved", unique_code: "LOW201", department: "Branch" }
+          ]];
+        }
+
+        if (sql.includes("SELECT id, quantity FROM inventory WHERE id = ?")) {
+          assert.deepEqual(params, ["INV-2"]);
+          return [[{ id: "INV-2", quantity: 2 }]];
+        }
+
+        throw new Error(`Unexpected SQL: ${sql}`);
+      }
+    });
+
+    await withTestApp(
+      { databaseManager: createMockDatabaseManager({ db }) },
+      async ({ baseUrl }) => {
+        const { response, data } = await fetchJson(baseUrl, "/requisitions/batch/batch-201/fulfill", {
+          method: "PUT",
+          headers: authHeaders(token),
+          body: JSON.stringify({ unique_code: "LOW201", receiver_id: "RCV-9" })
+        });
+
+        assert.equal(response.status, 400);
+        assert.match(data.error, /insufficient stock for item inv-2/i);
       }
     );
   });
@@ -476,12 +535,12 @@ describe("/requisitions routes", () => {
     const token = createTestToken({ id: 8, role: "stores" });
     const db = createMockDb({
       async execute(sql, params) {
-        if (sql.includes("SELECT isActive FROM users WHERE id = ?")) {
+        if (sql.includes("SELECT isActive, role, department_id FROM users WHERE id = ?")) {
           assert.equal(params[0], 8);
           return [[{ isActive: 1 }]];
         }
 
-        if (sql.includes("SELECT * FROM requisitions WHERE id = ?")) {
+        if (sql.includes("FROM requisitions WHERE id = ?")) {
           assert.deepEqual(params, [71]);
           return [[{ id: 71, status: "account_approved", unique_code: "REAL123", department: "Branch" }]];
         }
@@ -509,12 +568,12 @@ describe("/requisitions routes", () => {
     const token = createTestToken({ id: 8, role: "stores" });
     const db = createMockDb({
       async execute(sql, params) {
-        if (sql.includes("SELECT isActive FROM users WHERE id = ?")) {
+        if (sql.includes("SELECT isActive, role, department_id FROM users WHERE id = ?")) {
           assert.equal(params[0], 8);
           return [[{ isActive: 1 }]];
         }
 
-        if (sql.includes("SELECT * FROM requisitions WHERE id = ?")) {
+        if (sql.includes("FROM requisitions WHERE id = ?")) {
           assert.deepEqual(params, [72]);
           return [[{ id: 72, status: "account_approved", unique_code: "READY72", department: "Branch" }]];
         }
@@ -542,12 +601,12 @@ describe("/requisitions routes", () => {
     const token = createTestToken({ id: 8, role: "stores" });
     const db = createMockDb({
       async execute(sql, params) {
-        if (sql.includes("SELECT isActive FROM users WHERE id = ?")) {
+        if (sql.includes("SELECT isActive, role, department_id FROM users WHERE id = ?")) {
           assert.equal(params[0], 8);
           return [[{ isActive: 1 }]];
         }
 
-        if (sql.includes("SELECT * FROM requisitions WHERE unique_code = ?")) {
+        if (sql.includes("FROM requisitions WHERE unique_code = ?")) {
           assert.deepEqual(params, ["LOOK123"]);
           return [[{ id: 90, unique_code: "LOOK123", status: "account_approved" }]];
         }

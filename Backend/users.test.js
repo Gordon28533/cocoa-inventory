@@ -21,7 +21,7 @@ describe("/users routes", () => {
     const token = createTestToken({ id: 1, role: "admin" });
     const db = createMockDb({
       async execute(sql, params) {
-        if (sql.includes("SELECT isActive FROM users WHERE id = ?")) {
+        if (sql.includes("SELECT isActive, role, department_id FROM users WHERE id = ?")) {
           assert.equal(params[0], 1);
           return [[{ isActive: 1 }]];
         }
@@ -49,7 +49,7 @@ describe("/users routes", () => {
     const token = createTestToken({ id: 3, role: "user" });
     const db = createMockDb({
       async execute(sql, params) {
-        if (sql.includes("SELECT isActive FROM users WHERE id = ?")) {
+        if (sql.includes("SELECT isActive, role, department_id FROM users WHERE id = ?")) {
           assert.equal(params[0], 3);
           return [[{ isActive: 1 }]];
         }
@@ -75,7 +75,7 @@ describe("/users routes", () => {
     const token = createTestToken({ id: 1, role: "admin" });
     const db = createMockDb({
       async execute(sql, params) {
-        if (sql.includes("SELECT isActive FROM users WHERE id = ?")) {
+        if (sql.includes("SELECT isActive, role, department_id FROM users WHERE id = ?")) {
           assert.equal(params[0], 1);
           return [[{ isActive: 1 }]];
         }
@@ -107,7 +107,7 @@ describe("/users routes", () => {
     const token = createTestToken({ id: 1, role: "admin" });
     const db = createMockDb({
       async execute(sql, params) {
-        if (sql.includes("SELECT isActive FROM users WHERE id = ?")) {
+        if (sql.includes("SELECT isActive, role, department_id FROM users WHERE id = ?")) {
           assert.equal(params[0], 1);
           return [[{ isActive: 1 }]];
         }
@@ -136,14 +136,21 @@ describe("/users routes", () => {
     );
   });
 
-  it("creates a user with the default generated password when one is not provided", async () => {
+  it("creates a user with a random temporary password when one is not provided", async () => {
+    // H-2: Default password is now a random hex string, not predictable staffName+staffId
     const token = createTestToken({ id: 1, role: "admin" });
     const inserts = [];
+    const auditEntries = [];
     const db = createMockDb({
       async execute(sql, params) {
-        if (sql.includes("SELECT isActive FROM users WHERE id = ?")) {
+        if (sql.includes("SELECT isActive, role, department_id FROM users WHERE id = ?")) {
           assert.equal(params[0], 1);
-          return [[{ isActive: 1 }]];
+          return [[{ isActive: 1, role: "admin", department_id: null }]];
+        }
+
+        if (sql.includes("INSERT INTO audit_logs")) {
+          auditEntries.push(params);
+          return [{ affectedRows: 1 }];
         }
 
         throw new Error(`Unexpected SQL: ${sql}`);
@@ -177,7 +184,12 @@ describe("/users routes", () => {
         assert.equal(inserts[0].params[1], "A001");
         assert.equal(inserts[0].params[3], "user");
         assert.equal(inserts[0].params[4], 7);
-        assert.equal(await bcrypt.compare("AliceA001", inserts[0].params[2]), true);
+        // H-2: password is random — verify it is a valid bcrypt hash and NOT the old predictable value
+        assert.equal(await bcrypt.compare("AliceA001", inserts[0].params[2]), false);
+        assert.ok(inserts[0].params[2].startsWith("$2b$"), "should be a bcrypt hash");
+        // The response must include the one-time temporary password so the admin can hand it over
+        assert.ok(typeof data.temporaryPassword === "string", "response must include temporaryPassword");
+        assert.ok(data.temporaryPassword.length >= 16, "temporary password should be at least 16 hex chars");
       }
     );
   });

@@ -1,6 +1,6 @@
 # API Contract and Role Flow
 
-This document describes the current backend route surface exposed by [Backend/app.js](/C:/Users/PC/cocoa-inventory/Backend/app.js) and the role-based workflow enforced by the route handlers in [Backend/routes](/C:/Users/PC/cocoa-inventory/Backend/routes).
+This document describes the current backend route surface exposed by [Backend/app.js](/C:/Users/PC/inventory-system/Backend/app.js) and the role-based workflow enforced by the route handlers in [Backend/routes](/C:/Users/PC/inventory-system/Backend/routes).
 
 ## Base URL
 
@@ -8,7 +8,7 @@ By default, the frontend uses:
 
 - `http://localhost:5000`
 
-Configured in [api.js](/C:/Users/PC/cocoa-inventory/src/utils/api.js).
+Configured in [api.js](/C:/Users/PC/inventory-system/src/utils/api.js).
 
 Routes are mounted at the backend root. There is no `/api` prefix.
 
@@ -30,7 +30,7 @@ Routes are mounted at the backend root. There is no `/api` prefix.
 - `account_manager`
 - `stores`
 
-Shared role definitions live in [roles.js](/C:/Users/PC/cocoa-inventory/Backend/lib/roles.js).
+Shared role definitions live in [roles.js](/C:/Users/PC/inventory-system/Backend/lib/roles.js).
 
 ## Health and auth endpoints
 
@@ -346,7 +346,7 @@ Requires auth.
 
 ## Approval flow
 
-The main backend approval logic lives in [requisitionRoutes.js](/C:/Users/PC/cocoa-inventory/Backend/routes/requisitionRoutes.js).
+The main backend approval logic lives in [requisitionRoutes.js](/C:/Users/PC/inventory-system/Backend/routes/requisitionRoutes.js).
 
 ### Branch non-head-office flow
 
@@ -370,19 +370,19 @@ The main backend approval logic lives in [requisitionRoutes.js](/C:/Users/PC/coc
 4. `account_approved` by `account_manager`
 5. `fulfilled` by `stores`
 
-Ready-for-fulfillment statuses are centralized in [requisitions.js](/C:/Users/PC/cocoa-inventory/Backend/lib/requisitions.js):
+Ready-for-fulfillment statuses are centralized in [requisitions.js](/C:/Users/PC/inventory-system/Backend/lib/requisitions.js):
 
 - `account_approved`
 - `ho_account_approved`
 
 ## Frontend contract notes
 
-The frontend shared API client lives in [api.js](/C:/Users/PC/cocoa-inventory/src/utils/api.js).
+The frontend shared API client lives in [api.js](/C:/Users/PC/inventory-system/src/utils/api.js).
 
 Notable frontend behavior:
 
 - `401` responses from authenticated requests clear session storage and redirect to `/login`
-- auth/session state is centralized in [AuthContext.js](/C:/Users/PC/cocoa-inventory/src/Context/AuthContext.js)
+- auth/session state is centralized in [AuthContext.js](/C:/Users/PC/inventory-system/src/Context/AuthContext.js)
 - backend URL is centralized via `REACT_APP_API_URL` with a default of `http://localhost:5000`
 
 ## Testing and confidence
