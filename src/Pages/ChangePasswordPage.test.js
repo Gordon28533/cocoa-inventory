@@ -25,7 +25,7 @@ describe("ChangePasswordPage", () => {
   it("sets the page title and validates password confirmation before submitting", async () => {
     renderPage();
 
-    expect(document.title).toBe("Change Password | CMC Inventory");
+    expect(document.title).toBe("Change Password | Enterprise Inventory System");
 
     fireEvent.change(screen.getByLabelText(/Current Password/i), { target: { value: "old-pass" } });
     fireEvent.change(screen.getByLabelText(/^New Password$/i), { target: { value: "new-pass-123" } });

@@ -1,4 +1,4 @@
-import React, { useLayoutEffect, useState } from "react";
+import React, { useEffect, useLayoutEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../Context/AuthContext.js";
 import useDocumentTitle from "../hooks/useDocumentTitle.js";
@@ -9,22 +9,28 @@ const LoginPage = () => {
   const [staffName, setStaffName] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const navigate = useNavigate();
   const { login } = useAuth();
   const subtitleId = "login-subtitle";
-  const helpId = "login-help";
   const errorId = error ? "login-error" : undefined;
-  const sharedDescription = [subtitleId, helpId, errorId].filter(Boolean).join(" ");
+  const sharedDescription = [subtitleId, errorId].filter(Boolean).join(" ");
 
   useDocumentTitle("Sign In");
 
+  useEffect(() => {
+    const saved = localStorage.getItem("rememberedStaffName");
+    if (saved) {
+      setStaffName(saved);
+      setRememberMe(true);
+    }
+  }, []);
+
   useLayoutEffect(() => {
     const input = document.getElementById("staffName");
-    if (input) {
-      input.focus();
-    }
+    if (input) input.focus();
   }, []);
 
   const handleLogin = async (e) => {
@@ -36,6 +42,12 @@ const LoginPage = () => {
       const data = await api.login({ staffName, password });
 
       if (data.success && data.token) {
+        if (rememberMe) {
+          localStorage.setItem("rememberedStaffName", staffName);
+        } else {
+          localStorage.removeItem("rememberedStaffName");
+        }
+
         login({
           token: data.token,
           role: data.role,
@@ -52,72 +64,118 @@ const LoginPage = () => {
     }
   };
 
+  const handleForgotPassword = () => {
+    alert("Please contact your IT administrator to reset your password.");
+  };
+
   return (
-    <div className="login-container">
-      <div className="login-logo">
-        <img src="/cmc_logo1.jpg" alt="Cocoa Marketing Company Logo" />
+    <div className="login-split">
+      {/* Left decorative panel */}
+      <div className="login-panel login-panel--left" aria-hidden="true">
+        <span className="login-diamond login-diamond--1" />
+        <span className="login-diamond login-diamond--2" />
+        <span className="login-diamond login-diamond--3" />
+        <span className="login-diamond login-diamond--4" />
+        <div className="login-panel__copy">
+          <div className="login-panel__icon">
+            <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <rect x="4" y="4" width="18" height="18" rx="2" fill="white" fillOpacity="0.9"/>
+              <rect x="26" y="4" width="18" height="18" rx="2" fill="white" fillOpacity="0.6"/>
+              <rect x="4" y="26" width="18" height="18" rx="2" fill="white" fillOpacity="0.6"/>
+              <rect x="26" y="26" width="18" height="18" rx="2" fill="white" fillOpacity="0.3"/>
+            </svg>
+          </div>
+          <p className="login-panel__tagline">
+            Empowering your enterprise with efficient inventory management.
+          </p>
+        </div>
       </div>
-      <h2>Welcome Back</h2>
-      <p id={subtitleId} className="login-subtitle">Sign in to access your inventory dashboard</p>
-      <p id={helpId} className="field-help field-help--centered">
-        Use the staff name and password assigned to your account.
-      </p>
 
-      {error && (
-        <div id="login-error" className="error login-error" role="alert">
-          {error}
-        </div>
-      )}
+      {/* Right form panel */}
+      <div className="login-panel login-panel--right">
+        <div className="login-card">
+          <div className="login-logo">
+            <img src="/enterprise-ims-logo.svg" alt="Enterprise Inventory System" />
+          </div>
+          <p className="login-brand">Enterprise Inventory System</p>
+          <h2 id={subtitleId}>Welcome Back</h2>
 
-      <form onSubmit={handleLogin} aria-label="Login form">
-        <div className="form-group">
-          <label htmlFor="staffName">Staff Name</label>
-          <input
-            id="staffName"
-            name="staffName"
-            type="text"
-            placeholder="Enter your staff name"
-            value={staffName}
-            onChange={(e) => setStaffName(e.target.value)}
-            required
-            disabled={isLoading}
-            autoComplete="username"
-            aria-describedby={sharedDescription}
-            aria-invalid={Boolean(error)}
-          />
-        </div>
+          {error && (
+            <div id="login-error" className="error login-error" role="alert">
+              {error}
+            </div>
+          )}
 
-        <div className="form-group">
-          <label htmlFor="password" className="login-password-label">
-            <span>Password</span>
-            <button
-              type="button"
-              onClick={() => setShowPassword((v) => !v)}
-              className="login-toggle"
-              aria-label={showPassword ? "Hide password" : "Show password"}
-            >
-              {showPassword ? "Hide" : "Show"}
+          <form onSubmit={handleLogin} aria-label="Login form" aria-describedby={sharedDescription}>
+            <div className="form-group">
+              <label htmlFor="staffName">Employee ID</label>
+              <input
+                id="staffName"
+                name="staffName"
+                type="text"
+                placeholder="Employee ID"
+                value={staffName}
+                onChange={(e) => setStaffName(e.target.value)}
+                required
+                disabled={isLoading}
+                autoComplete="username"
+                aria-invalid={Boolean(error)}
+              />
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="password" className="login-password-label">
+                <span>Password</span>
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  className="login-toggle"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? "Hide" : "Show"}
+                </button>
+              </label>
+              <input
+                id="password"
+                name="password"
+                type={showPassword ? "text" : "password"}
+                placeholder="Password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                disabled={isLoading}
+                autoComplete="current-password"
+                aria-invalid={Boolean(error)}
+              />
+            </div>
+
+            <div className="login-row">
+              <label className="login-remember">
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  disabled={isLoading}
+                />
+                <span>Remember Me</span>
+              </label>
+              <button
+                type="button"
+                className="login-link"
+                onClick={handleForgotPassword}
+              >
+                Forgot Password?
+              </button>
+            </div>
+
+            <button className="login-submit" type="submit" disabled={isLoading}>
+              {isLoading ? "Signing In..." : "Sign In"}
             </button>
-          </label>
-          <input
-            id="password"
-            name="password"
-            type={showPassword ? "text" : "password"}
-            placeholder="Enter your password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            disabled={isLoading}
-            autoComplete="current-password"
-            aria-describedby={sharedDescription}
-            aria-invalid={Boolean(error)}
-          />
-        </div>
+          </form>
 
-        <button className="login-submit" type="submit" disabled={isLoading}>
-          {isLoading ? "Signing In..." : "Sign In"}
-        </button>
-      </form>
+          <p className="login-support">Need help? Contact IT Support</p>
+        </div>
+      </div>
     </div>
   );
 };

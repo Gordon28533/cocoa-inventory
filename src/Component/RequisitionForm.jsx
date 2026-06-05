@@ -3,192 +3,163 @@ import PropTypes from "prop-types";
 import { useAuth } from "../Context/AuthContext.js";
 import { useDepartments } from "../Context/DepartmentsContext.js";
 import StateNotice from "./ui/StateNotice.jsx";
-import StatusBadge from "./ui/StatusBadge.jsx";
 import { api } from "../utils/api.js";
 
-const sanitizeQuantity = (rawQuantity) => {
-  const parsed = Number.parseInt(rawQuantity, 10);
-
-  if (!Number.isFinite(parsed) || parsed < 1) {
-    return 1;
-  }
-
-  return parsed;
+const sanitizeQuantity = (raw) => {
+  const n = Number.parseInt(raw, 10);
+  return Number.isFinite(n) && n >= 1 ? n : 1;
 };
 
+const UNIT_OPTIONS = ["Each", "Box", "Pack", "Set", "Ream", "Carton", "Piece"];
+const PRIORITY_OPTIONS = ["Normal", "High", "Urgent"];
+
+const emptyRow = () => ({ _key: Date.now() + Math.random(), itemId: "", quantity: 1, unit: "Each" });
+
 const RequisitionForm = ({ inventory, setNotification }) => {
-  const [selectedItems, setSelectedItems] = useState([]);
+  const [step, setStep] = useState(1);
   const [departmentId, setDepartmentId] = useState("");
+  const [purpose, setPurpose] = useState("");
+  const [priority, setPriority] = useState("Normal");
   const [isItItem, setIsItItem] = useState(false);
+  const [itemRows, setItemRows] = useState([emptyRow()]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [uniqueCode, setUniqueCode] = useState("");
   const [deptError, setDeptError] = useState("");
-  const successCardRef = useRef(null);
-  const { departments, loading: departmentsLoading, error: departmentsError } = useDepartments();
-  const { departmentId: userDepartmentId, user: userName } = useAuth();
-  const departmentHintId = "requisition-department-help";
-  const departmentErrorId = deptError ? "requisition-department-error" : undefined;
-  const departmentDescription = [departmentHintId, departmentErrorId].filter(Boolean).join(" ");
+  const [uniqueCode, setUniqueCode] = useState("");
+  const successRef = useRef(null);
+
+  const { departments, loading: deptLoading, error: deptLoadError } = useDepartments();
+  const { departmentId: userDeptId } = useAuth();
 
   useEffect(() => {
-    if (userDepartmentId) {
-      setDepartmentId(String(userDepartmentId));
-    }
-  }, [userDepartmentId]);
+    if (userDeptId) setDepartmentId(String(userDeptId));
+  }, [userDeptId]);
 
   useEffect(() => {
-    if (uniqueCode) {
-      successCardRef.current?.focus();
-    }
+    if (uniqueCode) successRef.current?.focus();
   }, [uniqueCode]);
 
-  const filteredInventory = useMemo(
-    () =>
-      inventory.filter((item) => {
-        const normalizedSearch = searchTerm.toLowerCase();
-        return (
-          item.name?.toLowerCase().includes(normalizedSearch) ||
-          item.category?.toLowerCase().includes(normalizedSearch) ||
-          item.type?.toLowerCase().includes(normalizedSearch)
-        );
-      }),
-    [inventory, searchTerm]
+  const categories = useMemo(
+    () => [...new Set(inventory.map((i) => i.category).filter(Boolean))].sort(),
+    [inventory]
   );
 
-  const showNotification = (message, timeoutMs = 3000) => {
-    if (!setNotification) {
-      return;
+  const filteredInventory = useMemo(() => {
+    let items = inventory;
+    if (categoryFilter) items = items.filter((i) => i.category === categoryFilter);
+    if (searchTerm) {
+      const q = searchTerm.toLowerCase();
+      items = items.filter(
+        (i) =>
+          i.name?.toLowerCase().includes(q) ||
+          i.category?.toLowerCase().includes(q) ||
+          i.type?.toLowerCase().includes(q)
+      );
     }
+    return items;
+  }, [inventory, searchTerm, categoryFilter]);
 
-    setNotification(message);
-    setTimeout(() => setNotification(""), timeoutMs);
+  const filledRows = itemRows.filter((r) => r.itemId);
+
+  const showNotification = (msg, ms = 3000) => {
+    if (!setNotification) return;
+    setNotification(msg);
+    setTimeout(() => setNotification(""), ms);
   };
 
-  const handleCheckboxChange = (itemId) => {
-    setSelectedItems((current) => {
-      if (current.some((item) => item.id === itemId)) {
-        return current.filter((item) => item.id !== itemId);
-      }
-
-      return [
-        ...current,
-        {
-          id: itemId,
-          quantity: sanitizeQuantity(1)
-        }
-      ];
-    });
-  };
-
-  const handleQuantityChange = (itemId, quantity) => {
-    setSelectedItems((current) =>
-      current.map((item) =>
-        item.id === itemId
-          ? { ...item, quantity: sanitizeQuantity(quantity) }
-          : item
-      )
-    );
-  };
-
-  const handleDepartmentChange = (event) => {
-    const selectedDepartmentId = event.target.value;
-    setDepartmentId(selectedDepartmentId);
+  const handleDeptChange = (e) => {
+    const val = e.target.value;
+    setDepartmentId(val);
     setDeptError("");
-
-    if (!selectedDepartmentId) {
-      setDeptError("Please select a department.");
-      return;
-    }
-
-    if (userDepartmentId && selectedDepartmentId !== userDepartmentId) {
+    if (!val) { setDeptError("Please select a department."); return; }
+    if (userDeptId && val !== String(userDeptId)) {
       setDeptError("You can only submit requisitions for your own department.");
     }
   };
 
-  const handleSubmit = async (event) => {
-    event.preventDefault();
+  const updateRow = (key, field, value) => {
+    setItemRows((rows) =>
+      rows.map((r) => (r._key === key ? { ...r, [field]: value } : r))
+    );
+  };
 
-    if (selectedItems.length === 0) {
-      showNotification("Please select at least one item.");
-      return;
+  const addRow = () => setItemRows((rows) => [...rows, emptyRow()]);
+
+  const removeRow = (key) => {
+    setItemRows((rows) => {
+      const next = rows.filter((r) => r._key !== key);
+      return next.length ? next : [emptyRow()];
+    });
+  };
+
+  const resetForm = () => {
+    setStep(1);
+    setPurpose("");
+    setPriority("Normal");
+    setIsItItem(false);
+    setItemRows([emptyRow()]);
+    setSearchTerm("");
+    setCategoryFilter("");
+    setDeptError("");
+    setDepartmentId(userDeptId ? String(userDeptId) : "");
+  };
+
+  const handleSubmit = async () => {
+    if (!departmentId) { showNotification("Please select a department."); return; }
+    if (userDeptId && departmentId !== String(userDeptId)) {
+      const msg = "You can only submit requisitions for your own department.";
+      setDeptError(msg); showNotification(msg); return;
     }
+    if (filledRows.length === 0) { showNotification("Please add at least one item."); return; }
 
-    if (!departmentId) {
-      showNotification("Please select a department.");
-      return;
-    }
-
-    if (userDepartmentId && departmentId !== userDepartmentId) {
-      const message = "You can only submit requisitions for your own department.";
-      setDeptError(message);
-      showNotification(message);
-      return;
-    }
-
-    const normalizedItems = selectedItems.map((selectedItem) => ({
-      ...selectedItem,
-      quantity: sanitizeQuantity(selectedItem.quantity)
+    const normalizedItems = filledRows.map((r) => ({
+      id: r.itemId,
+      quantity: sanitizeQuantity(r.quantity)
     }));
 
-    const invalidItem = normalizedItems.find((selectedItem) => {
-      const inventoryItem = inventory.find((item) => item.id === selectedItem.id);
-
-      if (!inventoryItem) {
-        return true;
-      }
-
-      return selectedItem.quantity < 1 || selectedItem.quantity > inventoryItem.quantity;
+    const invalidItem = normalizedItems.find((sel) => {
+      const inv = inventory.find((i) => i.id === sel.id);
+      return !inv || sel.quantity < 1 || sel.quantity > inv.quantity;
     });
 
     if (invalidItem) {
-      const inventoryItem = inventory.find((item) => item.id === invalidItem.id);
-      showNotification(`Requested quantity exceeds available stock for ${inventoryItem?.name || invalidItem.id}.`);
+      const inv = inventory.find((i) => i.id === invalidItem.id);
+      showNotification(`Requested quantity exceeds available stock for ${inv?.name || invalidItem.id}.`);
       return;
     }
 
     setIsLoading(true);
-
     try {
       const data = await api.createRequisition({
         items: normalizedItems,
         department_id: Number.parseInt(departmentId, 10),
         is_it_item: isItItem
       });
-
       if (data.success) {
-        showNotification(`Requisition submitted! Your pickup code: ${data.unique_code}`);
+        showNotification(`Requisition submitted! Pickup code: ${data.unique_code}`);
         setUniqueCode(data.unique_code || "");
-        setSelectedItems([]);
-        setDepartmentId(userDepartmentId ? String(userDepartmentId) : "");
-        setIsItItem(false);
-        setSearchTerm("");
+        resetForm();
       }
-    } catch (error) {
-      showNotification(error.message || "Server error.");
+    } catch (err) {
+      showNotification(err.message || "Server error.");
     } finally {
       setIsLoading(false);
     }
   };
 
-  if (departmentsLoading) {
-    return <StateNotice>Loading departments...</StateNotice>;
-  }
-
-  if (departmentsError) {
-    return <StateNotice tone="error">Error loading departments: {departmentsError}</StateNotice>;
-  }
-
-  if (departments.length === 0) {
-    return <StateNotice tone="error">No departments available. Please contact admin.</StateNotice>;
-  }
+  if (deptLoading) return <StateNotice>Loading departments…</StateNotice>;
+  if (deptLoadError) return <StateNotice tone="error">Error loading departments: {deptLoadError}</StateNotice>;
+  if (departments.length === 0) return <StateNotice tone="error">No departments available. Please contact admin.</StateNotice>;
 
   return (
-    <div className="feature-panel">
+    <div className="rq-shell">
+
+      {/* ── Success card ─────────────────────────────────── */}
       {uniqueCode && (
         <div
           className="requisition-success-card"
-          ref={successCardRef}
+          ref={successRef}
           tabIndex={-1}
           role="status"
           aria-live="polite"
@@ -204,186 +175,292 @@ const RequisitionForm = ({ inventory, setNotification }) => {
           <div className="modal-actions requisition-success-card__actions">
             <button
               type="button"
-              aria-label="Copy pickup code"
               className="btn btn-secondary"
-              onClick={() => {
-                navigator.clipboard?.writeText?.(uniqueCode);
-                showNotification("Code copied to clipboard!", 2000);
-              }}
+              onClick={() => { navigator.clipboard?.writeText?.(uniqueCode); showNotification("Code copied!", 2000); }}
             >
               Copy Code
             </button>
-            <button type="button" aria-label="Clear pickup code" className="btn btn-secondary" onClick={() => setUniqueCode("")}>
-              Clear
-            </button>
+            <button type="button" className="btn btn-secondary" onClick={() => setUniqueCode("")}>Clear</button>
           </div>
         </div>
       )}
 
-      <div className="feature-panel__header">
-        <div>
-          <h2>Create Requisition</h2>
-          <p className="section-subtitle">
-            Select items from available stock, confirm the department, and submit a batch for approval.
-          </p>
-        </div>
+      {/* ── Step tabs ────────────────────────────────────── */}
+      <div className="rq-steps" role="tablist" aria-label="Form steps">
+        {[{ n: 1, label: "Details" }, { n: 2, label: "Items" }].map(({ n, label }) => (
+          <button
+            key={n}
+            role="tab"
+            type="button"
+            aria-selected={step === n}
+            className={`rq-step${step === n ? " rq-step--active" : ""}${n < step ? " rq-step--done" : ""}`}
+            onClick={() => setStep(n)}
+          >
+            <span className="rq-step__num">{n}</span>
+            <span className="rq-step__text">
+              <span className="rq-step__label">{label}</span>
+              <span className="rq-step__sub">Step {n}</span>
+            </span>
+          </button>
+        ))}
       </div>
 
-      <form onSubmit={handleSubmit} className="requisition-form">
-        <div className="feature-grid feature-grid--2">
-          <section className="feature-card">
-            <div className="feature-card__header">
-              <div>
-                <h3>Request Details</h3>
-                <p className="section-subtitle">Your requisition will be scoped to your department and approval path.</p>
-              </div>
-            </div>
+      {/* ── Layout: main + sidebar ────────────────────────── */}
+      <div className="rq-body">
+        <div className="rq-main">
 
-            <div className="requisition-form__meta">
-              <label className="form-group">
-                <span>Requester</span>
-                <input id="requester" name="requester" type="text" value={userName || ""} readOnly autoComplete="off" className="field-readonly" />
-              </label>
+          {/* ── STEP 1 ───────────────────────────────────── */}
+          {step === 1 && (
+            <>
+              <section className="rq-section">
+                <h3 className="rq-section__title">Requisition Details</h3>
+                <div className="rq-details-grid">
+                  {/* Department */}
+                  <div className="form-group">
+                    <label htmlFor="rq-dept">Department</label>
+                    <select
+                      id="rq-dept"
+                      value={departmentId}
+                      onChange={handleDeptChange}
+                      required
+                      className={deptError ? "field-error" : ""}
+                      aria-invalid={Boolean(deptError)}
+                    >
+                      <option value="">Select department</option>
+                      {departments.map((d) => (
+                        <option key={d.id} value={d.id}>{d.name}</option>
+                      ))}
+                    </select>
+                    {deptError && <span className="field-help" style={{ color: "var(--color-danger)" }}>{deptError}</span>}
+                  </div>
 
-              <label className="form-group">
-                <span>Department:</span>
-                <select
-                  id="departmentId"
-                  name="departmentId"
-                  value={departmentId}
-                  onChange={handleDepartmentChange}
-                  required
-                  className={deptError ? "field-error" : ""}
-                  aria-invalid={Boolean(deptError)}
-                  aria-describedby={departmentDescription}
-                >
-                  <option value="">Select a department</option>
-                  {departments.map((department) => (
-                    <option key={department.id} value={department.id}>
-                      {department.name}
-                    </option>
-                  ))}
-                </select>
-                <span id={departmentHintId} className="field-help">
-                  Requisitions are limited to the department assigned to your account.
-                </span>
-              </label>
+                  {/* Purpose */}
+                  <div className="form-group">
+                    <label htmlFor="rq-purpose">Purpose</label>
+                    <textarea
+                      id="rq-purpose"
+                      rows={4}
+                      placeholder="Describe the purpose of this requisition…"
+                      value={purpose}
+                      onChange={(e) => setPurpose(e.target.value)}
+                      className="rq-textarea"
+                    />
+                  </div>
 
-              {deptError && (
-                <div id="requisition-department-error">
-                  <StateNotice tone="error">{deptError}</StateNotice>
+                  {/* Priority */}
+                  <fieldset className="rq-priority">
+                    <legend>Priority Level</legend>
+                    <div className="rq-priority__options">
+                      {PRIORITY_OPTIONS.map((p) => (
+                        <label key={p} className="rq-priority__option">
+                          <input
+                            type="radio"
+                            name="rq-priority"
+                            value={p}
+                            checked={priority === p}
+                            onChange={() => setPriority(p)}
+                          />
+                          <span>{p}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </fieldset>
+
+                  {/* IT flag */}
+                  <label className="checkbox-row">
+                    <input
+                      type="checkbox"
+                      checked={isItItem}
+                      onChange={(e) => setIsItItem(e.target.checked)}
+                    />
+                    <span>Mark as IT requisition</span>
+                  </label>
                 </div>
-              )}
+              </section>
 
-              <label className="checkbox-row" htmlFor="isItItem">
-                <input
-                  id="isItItem"
-                  name="isItItem"
-                  type="checkbox"
-                  checked={isItItem}
-                  onChange={(event) => setIsItItem(event.target.checked)}
-                />
-                <span>Mark this batch as an IT requisition</span>
-              </label>
-            </div>
-          </section>
-
-          <section className="feature-card">
-            <div className="feature-card__header">
-              <div>
-                <h3>Search Inventory</h3>
-                <p className="section-subtitle">Find matching items by name, category, or type before selecting quantities.</p>
+              <div className="rq-step-nav">
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() => {
+                    if (!departmentId) { showNotification("Please select a department first."); return; }
+                    if (deptError) return;
+                    setStep(2);
+                  }}
+                >
+                  Next: Add Items →
+                </button>
               </div>
-            </div>
+            </>
+          )}
 
-            <label className="toolbar-field">
-              <span>Search Items</span>
-              <input
-                id="searchTerm"
-                name="searchTerm"
-                type="text"
-                placeholder="Search by item name, category, or type..."
-                value={searchTerm}
-                onChange={(event) => setSearchTerm(event.target.value)}
-                autoComplete="off"
-              />
-            </label>
+          {/* ── STEP 2 ───────────────────────────────────── */}
+          {step === 2 && (
+            <>
+              <section className="rq-section">
+                <h3 className="rq-section__title">Item Selection</h3>
+                <div className="rq-filters">
+                  <div className="rq-search-wrap">
+                    <svg className="rq-search-icon" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                      <circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" strokeWidth="1.6"/>
+                      <path d="M13 13l3.5 3.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+                    </svg>
+                    <input
+                      type="text"
+                      placeholder="Search"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="rq-search"
+                      aria-label="Search inventory items"
+                    />
+                  </div>
+                  <select
+                    value={categoryFilter}
+                    onChange={(e) => setCategoryFilter(e.target.value)}
+                    className="rq-cat-filter"
+                    aria-label="Filter by category"
+                  >
+                    <option value="">
+                      {categories.length === 0 ? "No categories" : categories.join(", ")}
+                    </option>
+                    {categories.map((c) => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                </div>
+              </section>
 
-            <div className="selection-summary">
-              <span>{filteredInventory.length} available</span>
-              <span>{selectedItems.length} selected</span>
-            </div>
-          </section>
+              <section className="rq-section">
+                <div className="rq-items-header">
+                  <h3 className="rq-section__title">Add Items</h3>
+                  <button type="button" className="btn btn-primary rq-add-btn" onClick={addRow}>
+                    Add
+                  </button>
+                </div>
+
+                <div className="rq-table-wrap">
+                  <table className="rq-table">
+                    <thead>
+                      <tr>
+                        <th>Item</th>
+                        <th>Quantity</th>
+                        <th>Unit</th>
+                        <th aria-label="Remove"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {itemRows.map((row) => {
+                        const selectedInv = inventory.find((i) => i.id === row.itemId);
+                        const maxQty = selectedInv?.quantity ?? 9999;
+                        return (
+                          <tr key={row._key}>
+                            <td>
+                              <select
+                                value={row.itemId}
+                                onChange={(e) => updateRow(row._key, "itemId", e.target.value)}
+                                className="rq-select"
+                                aria-label="Select item"
+                              >
+                                <option value="">— select item —</option>
+                                {filteredInventory.map((i) => (
+                                  <option key={i.id} value={i.id}>{i.name}</option>
+                                ))}
+                              </select>
+                            </td>
+                            <td>
+                              <input
+                                type="number"
+                                min={1}
+                                max={maxQty}
+                                value={row.quantity}
+                                onChange={(e) => updateRow(row._key, "quantity", e.target.value)}
+                                className="rq-qty"
+                                aria-label="Quantity"
+                              />
+                            </td>
+                            <td>
+                              <select
+                                value={row.unit}
+                                onChange={(e) => updateRow(row._key, "unit", e.target.value)}
+                                className="rq-select"
+                                aria-label="Unit"
+                              >
+                                {UNIT_OPTIONS.map((u) => (
+                                  <option key={u} value={u}>{u}</option>
+                                ))}
+                              </select>
+                            </td>
+                            <td>
+                              <button
+                                type="button"
+                                className="rq-remove-btn"
+                                onClick={() => removeRow(row._key)}
+                                aria-label="Remove row"
+                              >
+                                ×
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+
+              <div className="rq-step-nav">
+                <button type="button" className="btn btn-secondary" onClick={() => setStep(1)}>
+                  ← Back
+                </button>
+              </div>
+            </>
+          )}
         </div>
 
-        <section className="feature-card">
-          <div className="feature-card__header">
-            <div>
-              <h3>Select Items</h3>
-              <p className="section-subtitle">Choose one or more items and enter the quantities you want to request.</p>
-            </div>
-          </div>
-
-          {filteredInventory.length === 0 ? (
-            <StateNotice>{searchTerm ? "No items match your search." : "No items available."}</StateNotice>
+        {/* ── Summary sidebar ──────────────────────────── */}
+        <aside className="rq-summary" aria-label="Requisition summary">
+          <h3 className="rq-summary__title">Summary Items</h3>
+          {filledRows.length === 0 ? (
+            <p className="rq-summary__empty">No items added yet.</p>
           ) : (
-            <div className="requisition-item-picker">
-              {filteredInventory.map((item) => {
-                const checked = selectedItems.some((selectedItem) => selectedItem.id === item.id);
-                const quantity = selectedItems.find((selectedItem) => selectedItem.id === item.id)?.quantity || 1;
-
+            <ul className="rq-summary__list">
+              {filledRows.map((row) => {
+                const inv = inventory.find((i) => i.id === row.itemId);
                 return (
-                  <div key={item.id} className={`requisition-item-row${checked ? " requisition-item-row--selected" : ""}`}>
-                    <label className="requisition-item-row__selector" htmlFor={`itemCheckbox_${item.id}`}>
-                      <input
-                        id={`itemCheckbox_${item.id}`}
-                        name={`itemCheckbox_${item.id}`}
-                        type="checkbox"
-                        checked={checked}
-                        onChange={() => handleCheckboxChange(item.id)}
-                        aria-label={`Select ${item.name}`}
-                      />
-                      <div>
-                        <div className="requisition-item-row__title">{item.name}</div>
-                        <div className="requisition-item-row__meta">
-                          <span>{item.category}</span>
-                          <span>{item.type}</span>
-                          <StatusBadge label={`Stock: ${item.quantity}`} variant={item.quantity <= 10 ? "danger" : item.quantity <= 30 ? "warning" : "success"} />
-                        </div>
-                      </div>
-                    </label>
-
-                    <label className="toolbar-field requisition-item-row__quantity" htmlFor={`itemQty_${item.id}`}>
-                      <span>Quantity</span>
-                      <input
-                        id={`itemQty_${item.id}`}
-                        name={`itemQty_${item.id}`}
-                        aria-label={`Quantity for ${item.name}`}
-                        type="number"
-                        min={1}
-                        max={item.quantity}
-                        value={quantity}
-                        disabled={!checked}
-                        onChange={(event) => handleQuantityChange(item.id, event.target.value)}
-                      />
-                    </label>
-                  </div>
+                  <li key={row._key} className="rq-summary__item">
+                    <span className="rq-summary__name">{inv?.name ?? row.itemId}</span>
+                    <span className="rq-summary__qty">{row.quantity} {row.unit}</span>
+                  </li>
                 );
               })}
-            </div>
+            </ul>
           )}
-        </section>
+          <div className="rq-summary__total">
+            <span>Total Estimated Value</span>
+            <span className="rq-summary__total-val">—</span>
+          </div>
+        </aside>
+      </div>
 
-        <div className="modal-actions requisition-form__actions">
-          <button
-            type="submit"
-            className="btn btn-primary"
-            disabled={isLoading || selectedItems.length === 0 || !departmentId || !!deptError}
-          >
-            {isLoading ? "Submitting..." : "Submit Requisition"}
-          </button>
-        </div>
-      </form>
+      {/* ── Actions ──────────────────────────────────────── */}
+      <div className="rq-actions">
+        <button
+          type="button"
+          className="btn btn-secondary"
+          disabled={isLoading}
+          onClick={() => showNotification("Draft saved locally.", 2000)}
+        >
+          Save Draft
+        </button>
+        <button
+          type="button"
+          className="btn btn-primary"
+          disabled={isLoading || filledRows.length === 0 || !departmentId || !!deptError}
+          onClick={handleSubmit}
+        >
+          {isLoading ? "Submitting…" : "Submit for Approval"}
+        </button>
+      </div>
     </div>
   );
 };

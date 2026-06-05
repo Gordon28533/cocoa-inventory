@@ -5,7 +5,8 @@ USE `CMC_Inventory`;
 CREATE TABLE departments (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(100) NOT NULL UNIQUE,
-    description TEXT
+    description TEXT,
+    is_head_office TINYINT(1) NOT NULL DEFAULT 0
 );
 
 CREATE TABLE users (
@@ -50,6 +51,8 @@ CREATE TABLE requisitions (
     ) NOT NULL DEFAULT 'pending',
     unique_code VARCHAR(100) NOT NULL,
     is_it_item TINYINT(1) NOT NULL DEFAULT 0,
+    is_head_office TINYINT(1) NOT NULL DEFAULT 0,
+    rejected_by INT NULL,
     branch_account_approved_by INT NULL,
     ho_account_approved_by INT NULL,
     hod_approved_by INT NULL,
@@ -65,7 +68,8 @@ CREATE TABLE requisitions (
     CONSTRAINT fk_requisitions_hod FOREIGN KEY (hod_approved_by) REFERENCES users(id) ON DELETE SET NULL,
     CONSTRAINT fk_requisitions_it FOREIGN KEY (it_approved_by) REFERENCES users(id) ON DELETE SET NULL,
     CONSTRAINT fk_requisitions_account FOREIGN KEY (account_approved_by) REFERENCES users(id) ON DELETE SET NULL,
-    CONSTRAINT fk_requisitions_fulfilled FOREIGN KEY (fulfilled_by) REFERENCES users(id) ON DELETE SET NULL
+    CONSTRAINT fk_requisitions_fulfilled FOREIGN KEY (fulfilled_by) REFERENCES users(id) ON DELETE SET NULL,
+    CONSTRAINT fk_requisitions_rejected_by FOREIGN KEY (rejected_by) REFERENCES users(id) ON DELETE SET NULL
 );
 
 CREATE INDEX idx_requisitions_batch_id ON requisitions(batch_id);
@@ -78,19 +82,20 @@ CREATE TABLE audit_logs (
     user_id INT NOT NULL,
     action VARCHAR(255) NOT NULL,
     requisition_id VARCHAR(100) NULL,
+    details TEXT NULL,
     timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_audit_logs_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
-INSERT INTO departments (name, description) VALUES
-    ('Head Office', 'Head office approvals and fulfillment'),
-    ('Tema Takeover Center', 'Tema branch operations'),
-    ('Kumasi Takeover Center', 'Kumasi branch operations'),
-    ('Takoradi Takeover Center', 'Takoradi branch operations'),
-    ('IT', 'Information Technology'),
-    ('HR', 'Human Resources'),
-    ('Finance', 'Finance Department'),
-    ('Stores', 'Stores Department');
+INSERT INTO departments (name, description, is_head_office) VALUES
+    ('Head Office', 'Head office approvals and fulfillment', 1),
+    ('Tema Takeover Center', 'Tema branch operations', 0),
+    ('Kumasi Takeover Center', 'Kumasi branch operations', 0),
+    ('Takoradi Takeover Center', 'Takoradi branch operations', 0),
+    ('IT', 'Information Technology', 0),
+    ('HR', 'Human Resources', 0),
+    ('Finance', 'Finance Department', 0),
+    ('Stores', 'Stores Department', 0);
 
 INSERT INTO users (staffName, staffId, password, role, department_id, isActive) VALUES
     ('admin', 'ADMIN001', '$2b$10$fw77eZ/awDO2eWah/sOnK.yZzDAAQ13W.zeW4hJpbjfKy4XweRGfW', 'admin', 1, 1),

@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 
-const APP_NAME = "CMC Inventory";
+const APP_NAME = "Enterprise Inventory System";
 
 const buildDocumentTitle = (pageTitle) => {
   const normalizedTitle = String(pageTitle || "").trim();

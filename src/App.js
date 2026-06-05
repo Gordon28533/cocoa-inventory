@@ -94,52 +94,49 @@ const AppContent = () => {
           <a href="#main-content" className="skip-link">
             Skip to main content
           </a>
-          <header>
-            <div className="header-content">
-              <img src="/cmc_logo1.jpg" alt="Cocoa Marketing Company Logo" className="logo" />
-              <div className="header-text">
-                <h1>Inventory System</h1>
-                <p>Cocoa Marketing Company</p>
-              </div>
-              {token && (
-                <>
-                  <button
-                    type="button"
-                    className="app-nav-toggle"
-                    aria-expanded={isMobileMenuOpen}
-                    aria-controls="app-primary-nav"
-                    aria-label={isMobileMenuOpen ? "Close navigation menu" : "Open navigation menu"}
-                    onClick={() => setIsMobileMenuOpen((current) => !current)}
-                  >
-                    <span className="app-nav-toggle__icon" aria-hidden="true">
-                      {isMobileMenuOpen ? "X" : "|||"}
-                    </span>
-                    <span>{isMobileMenuOpen ? "Close" : "Menu"}</span>
-                  </button>
-                  <div className={`app-shell-controls${isMobileMenuOpen ? " app-shell-controls--open" : ""}`}>
-                    <nav id="app-primary-nav" className="app-nav" aria-label="Primary navigation">
-                      <NavLink to="/dashboard" className={getNavLinkClassName} onClick={closeMobileMenu}>
-                        Workspace
+          {token && (
+            <header>
+              <div className="header-content">
+                <img src="/enterprise-ims-logo.svg" alt="Enterprise Inventory System Logo" className="logo" />
+                <div className="header-text">
+                  <h1>Enterprise Inventory System</h1>
+                </div>
+                <button
+                  type="button"
+                  className="app-nav-toggle"
+                  aria-expanded={isMobileMenuOpen}
+                  aria-controls="app-primary-nav"
+                  aria-label={isMobileMenuOpen ? "Close navigation menu" : "Open navigation menu"}
+                  onClick={() => setIsMobileMenuOpen((current) => !current)}
+                >
+                  <span className="app-nav-toggle__icon" aria-hidden="true">
+                    {isMobileMenuOpen ? "X" : "|||"}
+                  </span>
+                  <span>{isMobileMenuOpen ? "Close" : "Menu"}</span>
+                </button>
+                <div className={`app-shell-controls${isMobileMenuOpen ? " app-shell-controls--open" : ""}`}>
+                  <nav id="app-primary-nav" className="app-nav" aria-label="Primary navigation">
+                    <NavLink to="/dashboard" className={getNavLinkClassName} onClick={closeMobileMenu}>
+                      Workspace
+                    </NavLink>
+                    {role === "admin" && (
+                      <NavLink to="/admin/users" className={getNavLinkClassName} onClick={closeMobileMenu}>
+                        User Management
                       </NavLink>
-                      {role === "admin" && (
-                        <NavLink to="/admin/users" className={getNavLinkClassName} onClick={closeMobileMenu}>
-                          User Management
-                        </NavLink>
-                      )}
-                    </nav>
-                    <div className="app-shell-actions">
-                      <NavLink to="/change-password" className="btn btn-secondary" onClick={closeMobileMenu}>
-                        Change Password
-                      </NavLink>
-                      <button onClick={handleLogout} className="btn btn-danger">
-                        Logout
-                      </button>
-                    </div>
+                    )}
+                  </nav>
+                  <div className="app-shell-actions">
+                    <NavLink to="/change-password" className="btn btn-secondary" onClick={closeMobileMenu}>
+                      Change Password
+                    </NavLink>
+                    <button onClick={handleLogout} className="btn btn-danger">
+                      Logout
+                    </button>
                   </div>
-                </>
-              )}
-            </div>
-          </header>
+                </div>
+              </div>
+            </header>
+          )}
 
           {!isLoading && token && role === "stores" && <StockAlert inventory={inventory} />}
 
