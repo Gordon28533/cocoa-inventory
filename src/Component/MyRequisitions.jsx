@@ -5,6 +5,7 @@ import StateNotice from "./ui/StateNotice.jsx";
 import StatusBadge from "./ui/StatusBadge.jsx";
 import { api } from "../utils/api.js";
 import { getBatchStatusMeta } from "../utils/requisitionStatus.js";
+import { getStatusLabel } from "../utils/statusLabels.js";
 
 const PAGE_SIZES = [5, 10, 20];
 
@@ -252,7 +253,7 @@ const MyRequisitions = ({ inventory }) => {
             <option value="">All statuses</option>
             {statusOptions.map((status) => (
               <option key={status} value={status}>
-                {status}
+                {getStatusLabel(status)}
               </option>
             ))}
           </select>
@@ -295,7 +296,7 @@ const MyRequisitions = ({ inventory }) => {
               <div className="batch-card__header">
                 <div className="batch-card__meta">
                   <div className="batch-card__title-row">
-                    <strong>Batch ID: {batch[0].batch_id}</strong>
+                    <strong title={batch[0].batch_id}>Ref: ...{batch[0].batch_id.slice(-6).toUpperCase()}</strong>
                     <StatusBadge color={batchStatus.color} variant={batchStatus.variant} className="batch-card__status">
                       <span className="status-badge__icon">{batchStatus.icon}</span>
                       {batchStatus.label}
@@ -350,7 +351,7 @@ const MyRequisitions = ({ inventory }) => {
                           <td>{item?.category || "-"}</td>
                           <td>{item?.type || "-"}</td>
                           <td>{requisition.quantity}</td>
-                          <td>{requisition.status}</td>
+                          <td title={requisition.status}>{getStatusLabel(requisition.status)}</td>
                         </tr>
                       );
                     })}

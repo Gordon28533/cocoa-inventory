@@ -2,10 +2,12 @@ import React, { useEffect, useMemo, useState } from "react";
 import PropTypes from "prop-types";
 import { useAuth } from "../Context/AuthContext.js";
 import { useDepartments } from "../Context/DepartmentsContext.js";
+import ModalCard from "./ui/ModalCard.jsx";
 import StateNotice from "./ui/StateNotice.jsx";
 import StatusBadge from "./ui/StatusBadge.jsx";
 import { api } from "../utils/api.js";
 import { getBatchStatusMeta } from "../utils/requisitionStatus.js";
+import { getStatusLabel } from "../utils/statusLabels.js";
 
 const getItemDetails = (inventory, itemId) => {
   const item = inventory.find((entry) => entry.id === itemId);
@@ -72,6 +74,10 @@ const RequisitionApproval = ({ setNotification, inventory }) => {
   const [sortKey, setSortKey] = useState("");
   const [sortAsc, setSortAsc] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
+  const [loadingBatchId, setLoadingBatchId] = useState(null);
+  const [rejectBatchId, setRejectBatchId] = useState(null);
+  const [rejectReason, setRejectReason] = useState("");
+  const [rejectLoading, setRejectLoading] = useState(false);
   const { token, role, departmentId } = useAuth();
   const { departments } = useDepartments();
 
@@ -152,6 +158,7 @@ const RequisitionApproval = ({ setNotification, inventory }) => {
 
   const handleBatchApprove = async (batchId) => {
     setMessage("");
+    setLoadingBatchId(batchId);
 
     try {
       const data = await api.approveRequisition(0, { batch_id: batchId });
@@ -161,6 +168,37 @@ const RequisitionApproval = ({ setNotification, inventory }) => {
       }
     } catch (error) {
       showFeedback(error.message || "Unable to approve the batch. Please try again.");
+    } finally {
+      setLoadingBatchId(null);
+    }
+  };
+
+  const openRejectModal = (batchId) => {
+    setRejectBatchId(batchId);
+    setRejectReason("");
+  };
+
+  const closeRejectModal = () => {
+    if (rejectLoading) return;
+    setRejectBatchId(null);
+    setRejectReason("");
+  };
+
+  const handleBatchReject = async () => {
+    if (!rejectBatchId || !rejectReason.trim()) return;
+    setRejectLoading(true);
+
+    try {
+      const data = await api.rejectRequisition(0, { batch_id: rejectBatchId, reason: rejectReason.trim() });
+      if (data.success) {
+        showFeedback("Batch rejected.");
+        closeRejectModal();
+        await fetchRequisitions();
+      }
+    } catch (error) {
+      showFeedback(error.message || "Unable to reject the batch. Please try again.");
+    } finally {
+      setRejectLoading(false);
     }
   };
 
@@ -206,6 +244,9 @@ const RequisitionApproval = ({ setNotification, inventory }) => {
             Review batches waiting at your approval stage, filter by department or status, and export details when needed.
           </p>
         </div>
+        <button type="button" className="btn btn-secondary" onClick={fetchRequisitions} disabled={isLoading}>
+          Refresh
+        </button>
       </div>
 
       <div className="filter-toolbar">
@@ -227,7 +268,7 @@ const RequisitionApproval = ({ setNotification, inventory }) => {
             <option value="">All statuses</option>
             {allStatuses.map((status) => (
               <option key={status} value={status}>
-                {status}
+                {getStatusLabel(status)}
               </option>
             ))}
           </select>
@@ -243,13 +284,22 @@ const RequisitionApproval = ({ setNotification, inventory }) => {
       ) : (
         filteredBatches.map((batch) => {
           const batchStatus = getBatchStatusMeta(batch);
+          const batchDate = batch[0].created_at
+            ? new Date(batch[0].created_at).toLocaleDateString("en-GB")
+            : "";
+          const isBusy = loadingBatchId === batch[0].batch_id;
 
           return (
             <div key={batch[0].batch_id} className="batch-card">
               <div className="batch-card__header">
                 <div className="batch-card__meta">
                   <div className="batch-card__title-row">
-                    <strong>Batch ID: {batch[0].batch_id}</strong>
+                    <strong title={batch[0].batch_id}>
+                      Ref: ...{batch[0].batch_id.slice(-6).toUpperCase()}
+                      {batchDate && (
+                        <span className="inventory-item-meta" style={{ marginLeft: "8px" }}>{batchDate}</span>
+                      )}
+                    </strong>
                     <StatusBadge variant={batchStatus.variant} color={batchStatus.color} className="batch-card__status">
                       <span className="status-badge__icon">{batchStatus.icon}</span>
                       {batchStatus.label}
@@ -304,7 +354,7 @@ const RequisitionApproval = ({ setNotification, inventory }) => {
                         <td>{details.category}</td>
                         <td>{details.type}</td>
                         <td>{requisition.quantity}</td>
-                        <td title={`Status: ${requisition.status}`}>{requisition.status}</td>
+                        <td title={requisition.status}>{getStatusLabel(requisition.status)}</td>
                       </tr>
                     );
                   })}
@@ -315,13 +365,23 @@ const RequisitionApproval = ({ setNotification, inventory }) => {
                 <button
                   className="btn btn-primary"
                   onClick={() => handleBatchApprove(batch[0].batch_id)}
+                  disabled={isBusy}
                   aria-label={`Approve batch ${batch[0].batch_id}`}
                 >
-                  Approve Batch
+                  {isBusy ? "Approving..." : "Approve Batch"}
+                </button>
+                <button
+                  className="btn btn-danger"
+                  onClick={() => openRejectModal(batch[0].batch_id)}
+                  disabled={isBusy}
+                  aria-label={`Reject batch ${batch[0].batch_id}`}
+                >
+                  Reject Batch
                 </button>
                 <button
                   className="btn btn-secondary"
                   onClick={() => exportBatchToCSV(batch)}
+                  disabled={isBusy}
                   aria-label={`Export batch ${batch[0].batch_id} to CSV`}
                 >
                   Export CSV
@@ -330,6 +390,45 @@ const RequisitionApproval = ({ setNotification, inventory }) => {
             </div>
           );
         })
+      )}
+
+      {rejectBatchId && (
+        <ModalCard title="Reject Batch" onClose={closeRejectModal}>
+          <p>
+            Provide a reason for rejecting batch{" "}
+            <strong title={rejectBatchId}>...{rejectBatchId.slice(-6).toUpperCase()}</strong>.
+          </p>
+          <label className="form-group" style={{ marginTop: "12px", display: "block" }}>
+            <span>Reason (required)</span>
+            <textarea
+              rows={4}
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+              placeholder="Enter rejection reason..."
+              required
+              disabled={rejectLoading}
+              style={{ width: "100%", marginTop: "6px" }}
+            />
+          </label>
+          <div className="modal-actions" style={{ marginTop: "16px" }}>
+            <button
+              type="button"
+              className="btn btn-danger"
+              onClick={handleBatchReject}
+              disabled={rejectLoading || !rejectReason.trim()}
+            >
+              {rejectLoading ? "Rejecting..." : "Confirm Reject"}
+            </button>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={closeRejectModal}
+              disabled={rejectLoading}
+            >
+              Cancel
+            </button>
+          </div>
+        </ModalCard>
       )}
     </div>
   );

@@ -5,6 +5,7 @@ import StateNotice from "./ui/StateNotice.jsx";
 import StatusBadge from "./ui/StatusBadge.jsx";
 import { api } from "../utils/api.js";
 import { APPROVED_BATCH_STATUSES, getBatchStatusMeta } from "../utils/requisitionStatus.js";
+import { getStatusLabel } from "../utils/statusLabels.js";
 
 const groupByBatchId = (requisitions) => {
   const grouped = {};
@@ -56,7 +57,8 @@ const RequisitionFulfill = ({ setNotification, inventory }) => {
         const statuses = group.map((item) => item.status);
         const allFulfilled = statuses.every((status) => status === "fulfilled");
         const allReady = statuses.every((status) => APPROVED_BATCH_STATUSES.has(status));
-        return !allFulfilled && !allReady;
+        const allRejected = statuses.every((status) => status === "rejected");
+        return !allFulfilled && !allReady && !allRejected;
       });
 
       ready.sort(sortByNewest);
@@ -206,6 +208,9 @@ const RequisitionFulfill = ({ setNotification, inventory }) => {
             Track batches still awaiting approval, open ready batches, and verify pickup details before fulfillment.
           </p>
         </div>
+        <button type="button" className="btn btn-secondary" onClick={fetchBatches} disabled={isLoading}>
+          Refresh
+        </button>
       </div>
 
       <div className="feature-grid feature-grid--2">
@@ -237,7 +242,12 @@ const RequisitionFulfill = ({ setNotification, inventory }) => {
                   const batchStatus = getBatchStatusMeta(currentBatch);
                   return (
                     <tr key={currentBatch[0].batch_id} className={index % 2 === 0 ? "row-alt" : ""}>
-                      <td>{currentBatch[0].batch_id}</td>
+                      <td>
+                        <span title={currentBatch[0].batch_id}>...{currentBatch[0].batch_id.slice(-6).toUpperCase()}</span>
+                        {currentBatch[0].created_at && (
+                          <div className="inventory-item-meta">{new Date(currentBatch[0].created_at).toLocaleDateString("en-GB")}</div>
+                        )}
+                      </td>
                       <td>{currentBatch[0].department}</td>
                       <td>{currentBatch.length}</td>
                       <td>
@@ -288,7 +298,12 @@ const RequisitionFulfill = ({ setNotification, inventory }) => {
                   const batchStatus = getBatchStatusMeta(currentBatch);
                   return (
                     <tr key={currentBatch[0].batch_id} className={index % 2 === 0 ? "row-alt" : ""}>
-                      <td>{currentBatch[0].batch_id}</td>
+                      <td>
+                        <span title={currentBatch[0].batch_id}>...{currentBatch[0].batch_id.slice(-6).toUpperCase()}</span>
+                        {currentBatch[0].created_at && (
+                          <div className="inventory-item-meta">{new Date(currentBatch[0].created_at).toLocaleDateString("en-GB")}</div>
+                        )}
+                      </td>
                       <td>{currentBatch[0].department}</td>
                       <td>{currentBatch.length}</td>
                       <td>
@@ -340,7 +355,12 @@ const RequisitionFulfill = ({ setNotification, inventory }) => {
             <div className="batch-card__header">
               <div className="batch-card__meta">
                 <div className="batch-card__title-row">
-                  <strong>Batch ID: {batch[0].batch_id}</strong>
+                  <strong title={batch[0].batch_id}>Ref: ...{batch[0].batch_id.slice(-6).toUpperCase()}</strong>
+                  {batch[0].created_at && (
+                    <span className="inventory-item-meta" style={{ marginLeft: "8px" }}>
+                      {new Date(batch[0].created_at).toLocaleDateString("en-GB")}
+                    </span>
+                  )}
                   {(() => {
                     const batchStatus = getBatchStatusMeta(batch);
                     return (
@@ -378,7 +398,7 @@ const RequisitionFulfill = ({ setNotification, inventory }) => {
                       <td>{details.category}</td>
                       <td>{details.type}</td>
                       <td>{item.quantity}</td>
-                      <td title={`Status: ${item.status}`}>{item.status}</td>
+                      <td title={item.status}>{getStatusLabel(item.status)}</td>
                     </tr>
                   );
                 })}

@@ -35,6 +35,8 @@ const InventoryList = ({ inventory, setInventory, onEditItem }) => {
   const [deleteLoading, setDeleteLoading] = useState(false);
   const addItemFeedbackId = feedbackMessage && showAddModal ? "inventory-add-feedback" : undefined;
 
+  const lowStockItems = inventory.filter((item) => item.quantity <= 10);
+
   const filteredInventory = inventory
     .filter((item) =>
       item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -124,7 +126,7 @@ const InventoryList = ({ inventory, setInventory, onEditItem }) => {
 
         {feedbackMessage && <StateNotice tone={feedbackTone}>{feedbackMessage}</StateNotice>}
 
-        {userRole === "stores" && (
+        {(userRole === "stores" || userRole === "admin") && (
           <button type="button" onClick={() => setShowAddModal(true)} className="btn btn-primary inventory-list__add-btn">
             Add Item
           </button>
@@ -152,6 +154,17 @@ const InventoryList = ({ inventory, setInventory, onEditItem }) => {
           </label>
         </div>
       </div>
+
+      {lowStockItems.length > 0 && (
+        <div className="stock-alert">
+          <h3>Low Stock Alert ({lowStockItems.length} {lowStockItems.length === 1 ? "item" : "items"})</h3>
+          <ul>
+            {lowStockItems.map((i) => (
+              <li key={i.id}>{i.name} — {i.quantity} remaining</li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {filteredInventory.length === 0 ? (
         <div className="inventory-empty-state">
@@ -202,7 +215,7 @@ const InventoryList = ({ inventory, setInventory, onEditItem }) => {
                     </td>
                     <td>{item.updated_at ? new Date(item.updated_at).toLocaleDateString() : "N/A"}</td>
                     <td>
-                      {userRole === "stores" && (
+                      {(userRole === "stores" || userRole === "admin") && (
                         <div className="table-actions">
                           <button
                             type="button"
