@@ -49,7 +49,14 @@ const Dashboard = ({
   isLoading = false
 }) => {
   const { token, user, role: userRole, currentPath, setCurrentPath } = useAuth();
-  const [activeTab, setActiveTab] = useState("inventory");
+  const [activeTab, setActiveTab] = useState(() => {
+    if (currentPath && currentPath.includes("tab=")) {
+      const params = new URLSearchParams(currentPath.split("?")[1]);
+      const tab = params.get("tab");
+      if (tab && DASHBOARD_TABS.includes(tab)) return tab;
+    }
+    return "inventory";
+  });
   const [editItem, setEditItem] = useState(null);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [notification, setNotification] = useState({ message: "", tone: "success" });
@@ -90,19 +97,6 @@ const Dashboard = ({
 
     setCurrentPath(`/dashboard?tab=${activeTab}`);
   }, [activeTab, setCurrentPath]);
-
-  useEffect(() => {
-    if (!currentPath || !currentPath.includes("tab=")) {
-      return;
-    }
-
-    const urlParams = new URLSearchParams(currentPath.split("?")[1]);
-    const tab = urlParams.get("tab");
-
-    if (tab && DASHBOARD_TABS.includes(tab)) {
-      setActiveTab(tab);
-    }
-  }, [currentPath]);
 
   useEffect(() => {
     const state = window.history.state;
