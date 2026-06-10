@@ -38,6 +38,7 @@
     "test:backend": "node --test Backend/*.test.js",
     "eject": "react-scripts eject",
     "start-backend": "npm run db:start && node Backend/server.js",
+    "start:render": "node Backend/server.js",
     "build-and-deploy": "npm run build && npm run start-backend",
     "dev": "powershell -ExecutionPolicy Bypass -File scripts/start-dev.ps1"
   },
