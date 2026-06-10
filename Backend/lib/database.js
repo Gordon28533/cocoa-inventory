@@ -1,10 +1,81 @@
-import mysql from "mysql2/promise";
+import pg from "pg";
+
+const { Pool } = pg;
 
 export function createDatabaseManager({ env = process.env, logger = console } = {}) {
   let pool = null;
 
+  // ── Compatibility helpers ─────────────────────────────────────────────────
+  //
+  // The rest of the codebase was written for mysql2, which uses:
+  //   • ? placeholders
+  //   • db.execute(sql, params) → [rows, fields]
+  //   • db.query(sql, params)   → [ResultSetHeader, fields]  (INSERT/UPDATE/DELETE)
+  //   • pool.getConnection() / conn.release()
+  //
+  // This shim makes pg behave the same way so no route file needs changing.
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /** Convert MySQL ? placeholders to PostgreSQL $1, $2, … */
+  function convertPlaceholders(sql) {
+    let i = 0;
+    return sql.replace(/\?/g, () => `$${++i}`);
+  }
+
+  /**
+   * Run a query against any pg Pool or PoolClient.
+   * Returns [rows] to mirror mysql2's destructured response.
+   * For INSERT statements without RETURNING, automatically appends
+   * "RETURNING id" so callers can read rows.insertId (= rows[0].id).
+   */
+  async function pgQuery(client, sql, params = []) {
+    const isInsert = /^\s*INSERT\b/i.test(sql);
+    let finalSql = convertPlaceholders(sql);
+
+    if (isInsert && !/\bRETURNING\b/i.test(finalSql)) {
+      finalSql += " RETURNING id";
+    }
+
+    const result = await client.query(finalSql, params);
+    const rows = result.rows;
+
+    // Attach insertId on the array object so callers can do:
+    //   const [result] = await db.query(...); result.insertId
+    if (isInsert && rows.length > 0) {
+      rows.insertId = rows[0].id;
+    }
+
+    return [rows];
+  }
+
+  /**
+   * Wrap a checked-out pg PoolClient to look like a mysql2 Connection.
+   * Used by withTransaction() in lib/requisitions.js.
+   */
+  function wrapConnection(client) {
+    return {
+      execute:         (sql, params) => pgQuery(client, sql, params),
+      query:           (sql, params) => pgQuery(client, sql, params),
+      beginTransaction: ()           => client.query("BEGIN"),
+      commit:           ()           => client.query("COMMIT"),
+      rollback:         ()           => client.query("ROLLBACK"),
+      release:          ()           => client.release(),
+    };
+  }
+
+  // ── Public API ────────────────────────────────────────────────────────────
+
   function getDb() {
-    return pool;
+    if (!pool) return null;
+    return {
+      execute:       (sql, params) => pgQuery(pool, sql, params),
+      query:         (sql, params) => pgQuery(pool, sql, params),
+      /** Mirrors mysql2 pool.getConnection() – used by withTransaction() */
+      getConnection: async () => {
+        const client = await pool.connect();
+        return wrapConnection(client);
+      },
+    };
   }
 
   function getDatabaseStatus() {
@@ -13,24 +84,25 @@ export function createDatabaseManager({ env = process.env, logger = console } = 
 
   async function connect() {
     try {
-      if (!env.DB_HOST || !env.DB_USER || !env.DB_NAME) {
-        logger.error("Missing required database environment variables");
+      if (!env.DATABASE_URL) {
+        logger.error("Missing required DATABASE_URL environment variable");
         return false;
       }
 
-      pool = mysql.createPool({
-        host: env.DB_HOST,
-        user: env.DB_USER,
-        password: env.DB_PASS || "",
-        database: env.DB_NAME,
-        waitForConnections: true,
-        connectionLimit: 10,
-        queueLimit: 0
+      pool = new Pool({
+        connectionString: env.DATABASE_URL,
+        // Render (and most hosted PG services) require SSL in production.
+        // rejectUnauthorized:false is safe here because the connection string
+        // already contains the correct host / credentials.
+        ssl: env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false,
+        max: 10,
+        idleTimeoutMillis: 30_000,
+        connectionTimeoutMillis: 5_000,
       });
 
-      // Verify the pool can actually reach the server before reporting success
-      const conn = await pool.getConnection();
-      conn.release();
+      // Verify connectivity before reporting success
+      const client = await pool.connect();
+      client.release();
 
       logger.log("Database connected successfully");
       return true;
@@ -45,97 +117,128 @@ export function createDatabaseManager({ env = process.env, logger = console } = 
     if (!pool) {
       return res.status(503).json({ error: "Database not available" });
     }
-
     next();
   }
 
+  // ── Schema helpers ────────────────────────────────────────────────────────
+
+  /**
+   * Add `column` to `table` only when it does not already exist.
+   * Uses information_schema so it is safe to call on every startup.
+   */
   async function runIfColumnMissing(db, table, column, alterSql) {
+    // NOTE: SQL already uses $1/$2 (not ?), so convertPlaceholders is a no-op.
     const [rows] = await db.execute(
       `SELECT 1 FROM information_schema.columns
-       WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ?`,
+       WHERE table_schema = 'public' AND table_name = $1 AND column_name = $2`,
       [table, column]
     );
     if (!rows.length) {
       logger.log(`Adding column ${table}.${column}…`);
-      await db.execute(alterSql);
+      await db.execute(alterSql, []);
     }
   }
 
   async function ensureSchema() {
-    if (!pool) {
-      return;
-    }
+    if (!pool) return;
 
-    const db = pool;
+    const db = getDb();
 
     try {
-      // ── Legacy fix: requisitions.item_id must be VARCHAR ──────────────────
-      const [rows] = await db.execute(
-        `SELECT DATA_TYPE FROM information_schema.columns
-         WHERE table_schema = DATABASE() AND table_name = 'requisitions' AND column_name = 'item_id'`
-      );
-      const itemIdType = rows?.[0] ? String(rows[0].DATA_TYPE || "").toLowerCase() : null;
+      // ── Core tables ───────────────────────────────────────────────────────
+      // SMALLINT is used for boolean-like columns so that existing code which
+      // inserts/compares 0 and 1 continues to work without changes.
 
-      if (itemIdType && !itemIdType.startsWith("varchar")) {
-        logger.log("Altering requisitions.item_id to VARCHAR(50)…");
+      await db.execute(`
+        CREATE TABLE IF NOT EXISTS departments (
+          id             SERIAL       PRIMARY KEY,
+          name           VARCHAR(100) NOT NULL UNIQUE,
+          description    TEXT,
+          is_head_office SMALLINT     NOT NULL DEFAULT 0
+        )
+      `, []);
 
-        const [fkRows] = await db.execute(
-          `SELECT CONSTRAINT_NAME FROM information_schema.KEY_COLUMN_USAGE
-           WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'requisitions' AND COLUMN_NAME = 'item_id' AND REFERENCED_TABLE_NAME IS NOT NULL`
-        );
+      await db.execute(`
+        CREATE TABLE IF NOT EXISTS users (
+          id            SERIAL       PRIMARY KEY,
+          "staffName"   VARCHAR(100) NOT NULL UNIQUE,
+          "staffId"     VARCHAR(50)  NOT NULL UNIQUE,
+          password      TEXT         NOT NULL,
+          role          VARCHAR(50)  NOT NULL DEFAULT 'user',
+          department_id INTEGER      REFERENCES departments(id) ON DELETE SET NULL,
+          "isActive"    SMALLINT     NOT NULL DEFAULT 1,
+          created_at    TIMESTAMP    NOT NULL DEFAULT NOW()
+        )
+      `, []);
 
-        if (fkRows.length) {
-          const fkName = fkRows[0].CONSTRAINT_NAME;
-          await db.execute(`ALTER TABLE requisitions DROP FOREIGN KEY \`${fkName}\``);
-        }
+      await db.execute(`
+        CREATE TABLE IF NOT EXISTS inventory (
+          id            VARCHAR(50)  PRIMARY KEY,
+          name          VARCHAR(255) NOT NULL,
+          category      VARCHAR(100),
+          quantity      INTEGER      NOT NULL DEFAULT 0,
+          unit          VARCHAR(50),
+          reorder_level INTEGER      NOT NULL DEFAULT 0,
+          description   TEXT,
+          created_at    TIMESTAMP    NOT NULL DEFAULT NOW()
+        )
+      `, []);
 
-        await db.execute("ALTER TABLE requisitions MODIFY item_id VARCHAR(50) NOT NULL");
+      await db.execute(`
+        CREATE TABLE IF NOT EXISTS requisitions (
+          id                         SERIAL       PRIMARY KEY,
+          item_id                    VARCHAR(50)  NOT NULL,
+          requested_by               VARCHAR(100),
+          department                 VARCHAR(100),
+          department_id              INTEGER      REFERENCES departments(id) ON DELETE SET NULL,
+          quantity                   INTEGER      NOT NULL DEFAULT 1,
+          status                     VARCHAR(50)  NOT NULL DEFAULT 'pending',
+          unique_code                VARCHAR(20),
+          is_it_item                 SMALLINT     NOT NULL DEFAULT 0,
+          is_head_office             SMALLINT     NOT NULL DEFAULT 0,
+          batch_id                   VARCHAR(50),
+          created_at                 TIMESTAMP    NOT NULL DEFAULT NOW(),
+          hod_approved_by            INTEGER,
+          branch_account_approved_by INTEGER,
+          ho_account_approved_by     INTEGER,
+          it_approved_by             INTEGER,
+          account_approved_by        INTEGER,
+          fulfilled_by               VARCHAR(100),
+          rejected_by                INTEGER
+        )
+      `, []);
 
-        const [invCol] = await db.execute(
-          `SELECT DATA_TYPE FROM information_schema.columns
-           WHERE table_schema = DATABASE() AND table_name = 'inventory' AND column_name = 'id'`
-        );
-        const invType = invCol?.[0] ? String(invCol[0].DATA_TYPE || "").toLowerCase() : null;
+      await db.execute(`
+        CREATE TABLE IF NOT EXISTS audit_logs (
+          id             SERIAL       PRIMARY KEY,
+          user_id        INTEGER      REFERENCES users(id) ON DELETE SET NULL,
+          action         VARCHAR(100) NOT NULL,
+          requisition_id INTEGER,
+          details        TEXT,
+          timestamp      TIMESTAMP    NOT NULL DEFAULT NOW()
+        )
+      `, []);
 
-        if (invType && invType.startsWith("varchar")) {
-          await db.execute(
-            `ALTER TABLE requisitions
-             ADD CONSTRAINT fk_requisitions_item FOREIGN KEY (item_id) REFERENCES inventory(id)
-             ON UPDATE CASCADE ON DELETE RESTRICT`
-          );
-        }
+      // ── Post-create seeds / idempotent migrations ─────────────────────────
 
-        logger.log("Schema update for requisitions.item_id complete.");
-      }
-
-      // ── H-7: is_head_office flag on departments ───────────────────────────
-      await runIfColumnMissing(
-        db, "departments", "is_head_office",
-        "ALTER TABLE departments ADD COLUMN is_head_office TINYINT(1) NOT NULL DEFAULT 0"
-      );
-      // Seed the flag for the canonical Head Office department
+      // Flag the canonical Head Office department
       await db.execute(
-        "UPDATE departments SET is_head_office = 1 WHERE name = 'Head Office' AND is_head_office = 0"
+        `UPDATE departments SET is_head_office = 1
+         WHERE name = 'Head Office' AND is_head_office = 0`,
+        []
       );
 
-      // ── H-7: propagate flag to requisitions so approval logic never uses string matching ──
-      await runIfColumnMissing(
-        db, "requisitions", "is_head_office",
-        "ALTER TABLE requisitions ADD COLUMN is_head_office TINYINT(1) NOT NULL DEFAULT 0"
-      );
+      // Ensure late-added columns are present on existing deployments
+      await runIfColumnMissing(db, "departments",  "is_head_office",
+        "ALTER TABLE departments ADD COLUMN is_head_office SMALLINT NOT NULL DEFAULT 0");
+      await runIfColumnMissing(db, "requisitions", "is_head_office",
+        "ALTER TABLE requisitions ADD COLUMN is_head_office SMALLINT NOT NULL DEFAULT 0");
+      await runIfColumnMissing(db, "audit_logs",   "details",
+        "ALTER TABLE audit_logs ADD COLUMN details TEXT NULL");
+      await runIfColumnMissing(db, "requisitions", "rejected_by",
+        "ALTER TABLE requisitions ADD COLUMN rejected_by INTEGER NULL");
 
-      // ── H-5: details column on audit_logs for richer audit entries ────────
-      await runIfColumnMissing(
-        db, "audit_logs", "details",
-        "ALTER TABLE audit_logs ADD COLUMN details TEXT NULL"
-      );
-
-      // ── M-10: rejected_by column on requisitions ──────────────────────────
-      await runIfColumnMissing(
-        db, "requisitions", "rejected_by",
-        "ALTER TABLE requisitions ADD COLUMN rejected_by INT NULL"
-      );
-
+      logger.log("Schema check complete");
     } catch (error) {
       logger.error("Schema check/update failed:", error);
     }
@@ -146,6 +249,6 @@ export function createDatabaseManager({ env = process.env, logger = console } = 
     ensureSchema,
     getDb,
     getDatabaseStatus,
-    requireDatabase
+    requireDatabase,
   };
 }

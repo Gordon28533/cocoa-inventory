@@ -11,7 +11,7 @@ dotenv.config({ path: join(__dirname, "..", ".env") });
 
 // L-2: Validate all required environment variables before anything else starts
 function validateEnv() {
-  const required = ["JWT_SECRET", "DB_HOST", "DB_USER", "DB_NAME"];
+  const required = ["JWT_SECRET", "DATABASE_URL"];
   const missing = required.filter((key) => !process.env[key]);
 
   if (missing.length) {
