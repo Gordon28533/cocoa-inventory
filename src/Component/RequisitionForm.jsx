@@ -11,12 +11,15 @@ const sanitizeQuantity = (raw) => {
 };
 
 const UNIT_OPTIONS = ["Each", "Box", "Pack", "Set", "Ream", "Carton", "Piece"];
+const PRIORITY_OPTIONS = ["Normal", "High", "Urgent"];
 
 const emptyRow = () => ({ _key: Date.now() + Math.random(), itemId: "", quantity: 1, unit: "Each" });
 
 const RequisitionForm = ({ inventory, setNotification }) => {
   const [step, setStep] = useState(1);
   const [departmentId, setDepartmentId] = useState("");
+  const [purpose, setPurpose] = useState("");
+  const [priority, setPriority] = useState("Normal");
   const [isItItem, setIsItItem] = useState(false);
   const [itemRows, setItemRows] = useState([emptyRow()]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -92,6 +95,8 @@ const RequisitionForm = ({ inventory, setNotification }) => {
 
   const resetForm = () => {
     setStep(1);
+    setPurpose("");
+    setPriority("Normal");
     setIsItItem(false);
     setItemRows([emptyRow()]);
     setSearchTerm("");
@@ -129,7 +134,9 @@ const RequisitionForm = ({ inventory, setNotification }) => {
       const data = await api.createRequisition({
         items: normalizedItems,
         department_id: Number.parseInt(departmentId, 10),
-        is_it_item: isItItem
+        is_it_item: isItItem,
+        purpose: purpose.trim(),
+        priority
       });
       if (data.success) {
         showNotification(`Requisition submitted! Pickup code: ${data.unique_code}`);
@@ -210,6 +217,7 @@ const RequisitionForm = ({ inventory, setNotification }) => {
               <section className="rq-section">
                 <h3 className="rq-section__title">Requisition Details</h3>
                 <div className="rq-details-grid">
+                  {/* Department */}
                   <div className="form-group">
                     <label htmlFor="rq-dept">Department</label>
                     <select
@@ -227,6 +235,48 @@ const RequisitionForm = ({ inventory, setNotification }) => {
                     </select>
                     {deptError && <span className="field-help" style={{ color: "var(--color-danger)" }}>{deptError}</span>}
                   </div>
+
+                  {/* Purpose */}
+                  <div className="form-group">
+                    <label htmlFor="rq-purpose">Purpose</label>
+                    <textarea
+                      id="rq-purpose"
+                      rows={4}
+                      placeholder="Describe the purpose of this requisition…"
+                      value={purpose}
+                      onChange={(e) => setPurpose(e.target.value)}
+                      className="rq-textarea"
+                    />
+                  </div>
+
+                  {/* Priority */}
+                  <fieldset className="rq-priority">
+                    <legend>Priority Level</legend>
+                    <div className="rq-priority__options">
+                      {PRIORITY_OPTIONS.map((p) => (
+                        <label key={p} className="rq-priority__option">
+                          <input
+                            type="radio"
+                            name="rq-priority"
+                            value={p}
+                            checked={priority === p}
+                            onChange={() => setPriority(p)}
+                          />
+                          <span>{p}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </fieldset>
+
+                  {/* IT flag */}
+                  <label className="checkbox-row">
+                    <input
+                      type="checkbox"
+                      checked={isItItem}
+                      onChange={(e) => setIsItItem(e.target.checked)}
+                    />
+                    <span>Mark as IT requisition</span>
+                  </label>
                 </div>
               </section>
 
@@ -249,20 +299,6 @@ const RequisitionForm = ({ inventory, setNotification }) => {
           {/* ── STEP 2 ───────────────────────────────────── */}
           {step === 2 && (
             <>
-              <section className="rq-section">
-                <label className="checkbox-row">
-                  <input
-                    type="checkbox"
-                    checked={isItItem}
-                    onChange={(e) => setIsItItem(e.target.checked)}
-                  />
-                  <span>Mark as IT requisition</span>
-                </label>
-                <p className="field-help" style={{ marginTop: "4px", paddingLeft: "24px" }}>
-                  Check this if any items below are IT equipment or services.
-                </p>
-              </section>
-
               <section className="rq-section">
                 <h3 className="rq-section__title">Item Selection</h3>
                 <div className="rq-filters">
@@ -398,6 +434,11 @@ const RequisitionForm = ({ inventory, setNotification }) => {
                 );
               })}
             </ul>
+          )}
+          {priority !== "Normal" && (
+            <div className="rq-summary__priority" data-priority={priority.toLowerCase()}>
+              Priority: {priority}
+            </div>
           )}
           <div className="rq-summary__total">
             <span>Total Line Items</span>
