@@ -82,11 +82,7 @@ export function createBackendApp({
   const { requireAuth, requireAdmin } = createAuthMiddleware({ getDb, jwtSecret });
 
   app.get("/health", (req, res) => {
-    res.json({
-      status: "ok",
-      database: getDatabaseStatus(),
-      timestamp: new Date().toISOString()
-    });
+    res.json({ status: "ok" });
   });
 
   app.get("/ws", (req, res) => {

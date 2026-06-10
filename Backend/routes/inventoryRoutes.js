@@ -21,7 +21,8 @@ export function createInventoryRouter({ getDb, requireAuth, requireDatabase, log
     try {
       // L-1: Explicit columns
       const [rows] = await db.execute(
-        `SELECT id, name, category, type, quantity FROM inventory ORDER BY name LIMIT ${limit} OFFSET ${offset}`
+        "SELECT id, name, category, type, quantity FROM inventory ORDER BY name LIMIT ? OFFSET ?",
+        [limit, offset]
       );
       res.json(rows);
     } catch (error) {

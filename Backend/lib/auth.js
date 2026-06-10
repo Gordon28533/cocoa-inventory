@@ -44,7 +44,7 @@ export function createAuthMiddleware({ getDb, jwtSecret }) {
       };
     } catch (error) {
       console.error(`${logLabel} user check failed:`, error.message);
-      return null; // fail-open on DB error so a transient glitch doesn't lock everyone out
+      return { status: 503, body: { error: "Service temporarily unavailable. Please try again." } };
     }
   }
 
@@ -69,7 +69,7 @@ export function createAuthMiddleware({ getDb, jwtSecret }) {
     }
 
     try {
-      const decoded = jwt.verify(token, jwtSecret);
+      const decoded = jwt.verify(token, jwtSecret, { algorithms: ["HS256"] });
 
       const result = await loadLiveUser(decoded?.id, logLabel);
 

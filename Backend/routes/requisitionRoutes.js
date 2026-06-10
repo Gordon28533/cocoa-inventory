@@ -142,7 +142,8 @@ export function createRequisitionRouter({ getDb, requireAuth, requireDatabase, l
         params.push(req.user.department_id);
       }
 
-      query += ` ORDER BY created_at DESC LIMIT ${limit} OFFSET ${offset}`;
+      query += " ORDER BY created_at DESC LIMIT ? OFFSET ?";
+      params.push(limit, offset);
       const [rows] = await db.execute(query, params);
       res.json(rows);
     } catch (error) {

@@ -40,7 +40,18 @@ export async function getTargetRequisitions(db, { requisitionId, batchId }) {
   return requisition ? [requisition] : [];
 }
 
+const ALLOWED_UPDATE_FIELDS = new Set([
+  "status", "hod_approved_by", "branch_account_approved_by", "ho_account_approved_by",
+  "it_approved_by", "account_approved_by", "fulfilled_by", "rejected_by"
+]);
+
 export async function updateRequisitionBatch(db, requisitions, updates) {
+  for (const field of Object.keys(updates)) {
+    if (!ALLOWED_UPDATE_FIELDS.has(field)) {
+      throw new Error(`Disallowed update field: ${field}`);
+    }
+  }
+
   const ids = requisitions.map((r) => r.id);
   const assignments = Object.keys(updates).map((field) => `${field} = ?`).join(", ");
 

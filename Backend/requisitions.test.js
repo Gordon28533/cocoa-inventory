@@ -124,7 +124,7 @@ describe("/requisitions routes", () => {
         }
 
         if (sql.includes("FROM requisitions WHERE requested_by = ?")) {
-          assert.deepEqual(params, [22]);
+          assert.equal(params[0], 22);
           return [[{ id: 5, requested_by: 22, status: "pending" }]];
         }
 
