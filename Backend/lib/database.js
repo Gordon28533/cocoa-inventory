@@ -238,6 +238,33 @@ export function createDatabaseManager({ env = process.env, logger = console } = 
       await runIfColumnMissing(db, "requisitions", "rejected_by",
         "ALTER TABLE requisitions ADD COLUMN rejected_by INTEGER NULL");
 
+      // ── Initial seed data (idempotent) ────────────────────────────────────
+      // Insert default departments if they don't exist yet.
+      await db.execute(`
+        INSERT INTO departments (name, description, is_head_office) VALUES
+          ('Head Office',             'Head office approvals and fulfillment', 1),
+          ('Tema Takeover Center',    'Tema branch operations',                0),
+          ('Kumasi Takeover Center',  'Kumasi branch operations',              0),
+          ('Takoradi Takeover Center','Takoradi branch operations',            0),
+          ('IT',                      'Information Technology',                0),
+          ('HR',                      'Human Resources',                       0),
+          ('Finance',                 'Finance Department',                    0),
+          ('Stores',                  'Stores Department',                     0)
+        ON CONFLICT (name) DO NOTHING
+      `, []);
+
+      // Insert default admin user if not present yet.
+      // Password hash is bcrypt of 'admin123'.
+      await db.execute(`
+        INSERT INTO users ("staffName", "staffId", password, role, department_id, "isActive")
+        SELECT 'admin', 'ADMIN001',
+               '$2b$10$fw77eZ/awDO2eWah/sOnK.yZzDAAQ13W.zeW4hJpbjfKy4XweRGfW',
+               'admin',
+               (SELECT id FROM departments WHERE name = 'Head Office' LIMIT 1),
+               1
+        WHERE NOT EXISTS (SELECT 1 FROM users WHERE "staffName" = 'admin')
+      `, []);
+
       logger.log("Schema check complete");
     } catch (error) {
       logger.error("Schema check/update failed:", error);
