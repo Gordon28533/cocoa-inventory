@@ -183,7 +183,13 @@ const AdminAddUser = () => {
       });
 
       if (data.success) {
-        setMessage("User added successfully!");
+        if (data.temporaryPassword) {
+          setMessage(
+            `User added successfully! Temporary password: ${data.temporaryPassword} — copy this now, it won't be shown again.`
+          );
+        } else {
+          setMessage("User added successfully!");
+        }
         resetCreateForm();
         await fetchUsers();
       }
@@ -418,12 +424,16 @@ const AdminAddUser = () => {
               id="password"
               name="password"
               type="password"
-              placeholder="Password (leave blank for default)"
+              placeholder="Min 8 characters (leave blank to auto-generate)"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               autoComplete="new-password"
-              aria-describedby={createUserDescription || undefined}
+              minLength={8}
+              aria-describedby="create-user-password-hint"
             />
+            <span id="create-user-password-hint" className="field-help">
+              Leave blank to auto-generate a temporary password. If you set one, it must be at least 8 characters.
+            </span>
           </label>
           <div className="admin-user-form__actions">
             <button type="submit" className="btn btn-primary" disabled={savingUser}>
