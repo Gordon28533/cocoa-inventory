@@ -38,7 +38,7 @@ export function createAuthRouter({
     try {
       // M-1: Select only the columns we actually need — never SELECT *
       const [rows] = await db.execute(
-        "SELECT id, staffName, role, department_id, isActive, password FROM users WHERE staffName = ?",
+        'SELECT id, "staffName", role, department_id, "isActive", password FROM users WHERE "staffName" = ?',
         [staffName]
       );
 
@@ -139,7 +139,7 @@ export function createAuthRouter({
 
     try {
       const [rows] = await db.execute(
-        "SELECT id, staffName, role, department_id FROM users WHERE id = ?",
+        'SELECT id, "staffName", role, department_id FROM users WHERE id = ?',
         [req.user.id]
       );
       if (rows.length === 0) {

@@ -25,7 +25,7 @@ export function createUserRouter({ getDb, requireAdmin, requireDatabase, logAudi
     try {
       // L-1: Explicit columns — never expose the password hash
       const [rows] = await db.execute(
-        "SELECT id, staffName, staffId, role, department_id, isActive FROM users ORDER BY staffName"
+        'SELECT id, "staffName", "staffId", role, department_id, "isActive" FROM users ORDER BY "staffName"'
       );
       res.json(rows);
     } catch (error) {
@@ -70,11 +70,11 @@ export function createUserRouter({ getDb, requireAdmin, requireDatabase, logAudi
       const params = [];
 
       if (hasText(staffName, 100)) {
-        updateFields.push("staffName = ?");
+        updateFields.push('"staffName" = ?');
         params.push(staffName.trim());
       }
       if (hasText(staffId, 50)) {
-        updateFields.push("staffId = ?");
+        updateFields.push('"staffId" = ?');
         params.push(staffId.trim());
       }
       if (role) {
@@ -153,7 +153,7 @@ export function createUserRouter({ getDb, requireAdmin, requireDatabase, logAudi
     }
 
     try {
-      await db.execute("UPDATE users SET isActive = 0 WHERE id = ?", [userId]);
+      await db.execute('UPDATE users SET "isActive" = 0 WHERE id = ?', [userId]);
 
       // H-5: Audit deactivation
       await logAudit(req.user.id, "deactivate_user", userId);
@@ -176,7 +176,7 @@ export function createUserRouter({ getDb, requireAdmin, requireDatabase, logAudi
     }
 
     try {
-      await db.execute("UPDATE users SET isActive = 1 WHERE id = ?", [userId]);
+      await db.execute('UPDATE users SET "isActive" = 1 WHERE id = ?', [userId]);
 
       // H-5: Audit reactivation
       await logAudit(req.user.id, "activate_user", userId);
@@ -242,7 +242,7 @@ export function createUserRouter({ getDb, requireAdmin, requireDatabase, logAudi
 
       const hashedPassword = await bcrypt.hash(password, 10);
       const [result] = await db.query(
-        "INSERT INTO users (staffName, staffId, password, role, department_id, isActive) VALUES (?, ?, ?, ?, ?, 1)",
+        'INSERT INTO users ("staffName", "staffId", password, role, department_id, "isActive") VALUES (?, ?, ?, ?, ?, 1)',
         [staffName, staffId, hashedPassword, role, toNullablePositiveInteger(department_id)]
       );
 
@@ -277,7 +277,7 @@ export function createUserRouter({ getDb, requireAdmin, requireDatabase, logAudi
       // M-6: Limit logs to 200 most-recent entries; use explicit columns
       const [rows] = await db.execute(
         `SELECT l.id, l.user_id, l.action, l.requisition_id, l.details, l.timestamp,
-                u.staffName
+                u."staffName"
          FROM audit_logs l
          LEFT JOIN users u ON l.user_id = u.id
          ORDER BY l.timestamp DESC

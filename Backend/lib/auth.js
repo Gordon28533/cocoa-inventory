@@ -26,7 +26,7 @@ export function createAuthMiddleware({ getDb, jwtSecret }) {
 
     try {
       const [[user]] = await db.execute(
-        "SELECT isActive, role, department_id FROM users WHERE id = ?",
+        'SELECT "isActive", role, department_id FROM users WHERE id = ?',
         [userId]
       );
 
