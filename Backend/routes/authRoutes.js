@@ -23,13 +23,40 @@ export function createAuthRouter({
   const router = express.Router();
 
   router.get("/auth/validate", requireAuth, (req, res) => {
-    res.json({ id: req.user.id, staffName: req.user.staffName, role: req.user.role });
+    res.json({
+      id: req.user.id,
+      staffName: req.user.staffName,
+      staffId: req.user.staffId,
+      role: req.user.role
+    });
   });
 
+  // POST /auth/refresh — issue a fresh 8-hour token without re-entering credentials
+  router.post("/auth/refresh", requireAuth, (req, res) => {
+    try {
+      const token = jwt.sign(
+        {
+          id: req.user.id,
+          staffName: req.user.staffName,
+          staffId: req.user.staffId,
+          role: req.user.role,
+          department_id: req.user.department_id
+        },
+        jwtSecret,
+        { expiresIn: "8h" }
+      );
+      return res.json({ success: true, token });
+    } catch (error) {
+      logUnexpectedError(console, "Token refresh error", error);
+      return serverError(res, "Token refresh failed");
+    }
+  });
+
+  // POST /login — authenticate by staffId (the employee number shown on their ID card)
   router.post("/login", rateLimit, requireDatabase, async (req, res) => {
     const db = getDb();
-    const { staffName, password } = req.body;
-    const missingFieldError = ensureRequiredFields({ staffName, password });
+    const { staffId, password } = req.body;
+    const missingFieldError = ensureRequiredFields({ staffId, password });
 
     if (missingFieldError) {
       return badRequest(res, missingFieldError);
@@ -38,8 +65,8 @@ export function createAuthRouter({
     try {
       // M-1: Select only the columns we actually need — never SELECT *
       const [rows] = await db.execute(
-        'SELECT id, "staffName", role, department_id, "isActive", password FROM users WHERE "staffName" = ?',
-        [staffName]
+        'SELECT id, "staffName", "staffId", role, department_id, "isActive", password FROM users WHERE "staffId" = ?',
+        [staffId]
       );
 
       if (rows.length > 0) {
@@ -58,6 +85,7 @@ export function createAuthRouter({
             {
               id: user.id,
               staffName: user.staffName,
+              staffId: user.staffId,
               role: user.role,
               department_id: user.department_id
             },
@@ -72,6 +100,8 @@ export function createAuthRouter({
             success: true,
             token,
             role: user.role,
+            staffName: user.staffName,
+            staffId: user.staffId,
             department_id: user.department_id
           });
         }
@@ -139,7 +169,7 @@ export function createAuthRouter({
 
     try {
       const [rows] = await db.execute(
-        'SELECT id, "staffName", role, department_id FROM users WHERE id = ?',
+        'SELECT id, "staffName", "staffId", role, department_id FROM users WHERE id = ?',
         [req.user.id]
       );
       if (rows.length === 0) {

@@ -6,7 +6,7 @@ import { api } from "../utils/api.js";
 import "../styles.css";
 
 const LoginPage = () => {
-  const [staffName, setStaffName] = useState("");
+  const [staffId, setStaffId] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
@@ -21,15 +21,15 @@ const LoginPage = () => {
   useDocumentTitle("Sign In");
 
   useEffect(() => {
-    const saved = localStorage.getItem("rememberedStaffName");
+    const saved = localStorage.getItem("rememberedStaffId");
     if (saved) {
-      setStaffName(saved);
+      setStaffId(saved);
       setRememberMe(true);
     }
   }, []);
 
   useLayoutEffect(() => {
-    const input = document.getElementById("staffName");
+    const input = document.getElementById("staffId");
     if (input) input.focus();
   }, []);
 
@@ -39,19 +39,20 @@ const LoginPage = () => {
     setError("");
 
     try {
-      const data = await api.login({ staffName, password });
+      const data = await api.login({ staffId, password });
 
       if (data.success && data.token) {
         if (rememberMe) {
-          localStorage.setItem("rememberedStaffName", staffName);
+          localStorage.setItem("rememberedStaffId", staffId);
         } else {
-          localStorage.removeItem("rememberedStaffName");
+          localStorage.removeItem("rememberedStaffId");
         }
 
         login({
           token: data.token,
           role: data.role,
-          user: staffName,
+          user: data.staffName || staffId,
+          staffId: data.staffId || staffId,
           departmentId: data.department_id
         });
 
@@ -108,14 +109,14 @@ const LoginPage = () => {
 
           <form onSubmit={handleLogin} aria-label="Login form" aria-describedby={sharedDescription}>
             <div className="form-group">
-              <label htmlFor="staffName">Employee ID</label>
+              <label htmlFor="staffId">Employee ID</label>
               <input
-                id="staffName"
-                name="staffName"
+                id="staffId"
+                name="staffId"
                 type="text"
                 placeholder="Employee ID"
-                value={staffName}
-                onChange={(e) => setStaffName(e.target.value)}
+                value={staffId}
+                onChange={(e) => setStaffId(e.target.value)}
                 required
                 disabled={isLoading}
                 autoComplete="username"

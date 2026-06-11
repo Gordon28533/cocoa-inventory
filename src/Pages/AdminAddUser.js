@@ -1,4 +1,3 @@
-import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import AuditLogViewer from "../Component/AuditLogViewer.jsx";
 import ConfirmDialog from "../Component/ui/ConfirmDialog.jsx";
@@ -46,7 +45,7 @@ const getMessageTone = (message) => {
 
 const AdminAddUser = () => {
   const navigate = useNavigate();
-  const { role: userRole, user: adminName } = useAuth();
+  const { role: userRole, user: adminName, staffId: adminStaffId } = useAuth();
   const { departments } = useDepartments();
 
   const [staffName, setStaffName] = useState("");
@@ -155,7 +154,8 @@ const AdminAddUser = () => {
     setPasswordChecking(true);
 
     try {
-      const data = await api.login({ staffName: adminName, password: passwordInput });
+      // Re-authenticate using staffId (the employee number) not staffName
+      const data = await api.login({ staffId: adminStaffId, password: passwordInput });
 
       if (data.success) {
         setPasswordPrompt(false);
@@ -211,19 +211,31 @@ const AdminAddUser = () => {
       const request =
         confirmAction.type === "delete"
           ? api.deleteUser(confirmAction.user.id)
-          : api.deactivateUser(confirmAction.user.id);
+          : confirmAction.type === "activate"
+            ? api.activateUser(confirmAction.user.id)
+            : api.deactivateUser(confirmAction.user.id);
 
       const data = await request;
 
       if (data.success) {
-        setMessage(confirmAction.type === "delete" ? "User deleted successfully!" : "User deactivated successfully!");
+        setMessage(
+          confirmAction.type === "delete"
+            ? "User deleted successfully!"
+            : confirmAction.type === "activate"
+              ? "User activated successfully!"
+              : "User deactivated successfully!"
+        );
         setConfirmAction(null);
         await fetchUsers();
       }
     } catch (error) {
       setMessage(
         error.message ||
-          (confirmAction.type === "delete" ? "Failed to delete user." : "Failed to deactivate user.")
+          (confirmAction.type === "delete"
+            ? "Failed to delete user."
+            : confirmAction.type === "activate"
+              ? "Failed to activate user."
+              : "Failed to deactivate user.")
       );
     } finally {
       setSavingUser(false);
@@ -510,7 +522,15 @@ const AdminAddUser = () => {
                             Deactivate
                           </button>
                         ) : (
-                          <span className="muted-text">Deactivated</span>
+                          <button
+                            type="button"
+                            className="btn btn-success btn-compact"
+                            onClick={() => setConfirmAction({ type: "activate", user })}
+                            disabled={savingUser}
+                            aria-label={`Activate ${user.staffName}`}
+                          >
+                            Activate
+                          </button>
                         )}
                         <button
                           type="button"
@@ -620,13 +640,27 @@ const AdminAddUser = () => {
 
       {confirmAction && (
         <ConfirmDialog
-          title={confirmAction.type === "delete" ? "Delete User" : "Deactivate User"}
+          title={
+            confirmAction.type === "delete"
+              ? "Delete User"
+              : confirmAction.type === "activate"
+                ? "Activate User"
+                : "Deactivate User"
+          }
           message={
             confirmAction.type === "delete"
               ? `Delete ${confirmAction.user.staffName}? This action cannot be undone.`
-              : `Deactivate ${confirmAction.user.staffName}? They will lose access until reactivated.`
+              : confirmAction.type === "activate"
+                ? `Activate ${confirmAction.user.staffName}? They will regain access to the system.`
+                : `Deactivate ${confirmAction.user.staffName}? They will lose access until reactivated.`
           }
-          confirmLabel={confirmAction.type === "delete" ? "Delete User" : "Deactivate User"}
+          confirmLabel={
+            confirmAction.type === "delete"
+              ? "Delete User"
+              : confirmAction.type === "activate"
+                ? "Activate User"
+                : "Deactivate User"
+          }
           isLoading={savingUser}
           onConfirm={handleConfirmAction}
           onCancel={() => setConfirmAction(null)}

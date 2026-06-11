@@ -28,6 +28,7 @@ export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(storedSession.token);
   const [role, setRole] = useState(storedSession.role);
   const [user, setUser] = useState(storedSession.user);
+  const [staffId, setStaffId] = useState(storedSession.staffId);
   const [departmentId, setDepartmentId] = useState(storedSession.departmentId);
   const [currentPath, setCurrentPathState] = useState(normalizeCurrentPath(getStoredCurrentPath()));
   const [isAuthChecked, setIsAuthChecked] = useState(false);
@@ -46,20 +47,23 @@ export const AuthProvider = ({ children }) => {
     setToken(session.token);
     setRole(session.role);
     setUser(session.user);
+    setStaffId(session.staffId);
     setDepartmentId(session.departmentId);
     setCurrentPathState(nextPath);
   }, []);
 
-  const login = useCallback(({ token: nextToken, role: nextRole, user: nextUser, departmentId: nextDepartmentId }) => {
+  const login = useCallback(({ token: nextToken, role: nextRole, user: nextUser, staffId: nextStaffId, departmentId: nextDepartmentId }) => {
     persistSession({
       token: nextToken,
       role: nextRole || "guest",
       user: nextUser || "",
+      staffId: nextStaffId || "",
       departmentId: nextDepartmentId
     });
     setToken(nextToken);
     setRole(nextRole || "guest");
     setUser(nextUser || "");
+    setStaffId(nextStaffId || "");
     setDepartmentId(nextDepartmentId ? String(nextDepartmentId) : "");
     setErrorMsg("");
     setIsAuthChecked(false);
@@ -71,6 +75,7 @@ export const AuthProvider = ({ children }) => {
     setToken(null);
     setRole("guest");
     setUser("");
+    setStaffId("");
     setDepartmentId("");
     setCurrentPathState("/dashboard");
     setErrorMsg("");
@@ -114,16 +119,19 @@ export const AuthProvider = ({ children }) => {
 
         const nextRole = authData.role || "guest";
         const nextUser = authData.staffName || user || "";
+        const nextStaffId = authData.staffId || staffId || "";
 
         persistSession({
           token,
           role: nextRole,
           user: nextUser,
+          staffId: nextStaffId,
           departmentId
         });
 
         setRole(nextRole);
         setUser(nextUser);
+        setStaffId(nextStaffId);
         setErrorMsg("");
       } catch (error) {
         if (!isMounted) {
@@ -135,6 +143,7 @@ export const AuthProvider = ({ children }) => {
         setToken(null);
         setRole("guest");
         setUser("");
+        setStaffId("");
         setDepartmentId("");
         setCurrentPathState("/dashboard");
         setStoredCurrentPath("/dashboard");
@@ -167,6 +176,7 @@ export const AuthProvider = ({ children }) => {
       token,
       role,
       user,
+      staffId,
       departmentId,
       currentPath,
       isAuthChecked,
@@ -177,7 +187,7 @@ export const AuthProvider = ({ children }) => {
       setCurrentPath,
       syncFromStorage
     }),
-    [currentPath, departmentId, errorMsg, isAuthChecked, login, logout, role, setCurrentPath, syncFromStorage, token, user]
+    [currentPath, departmentId, errorMsg, isAuthChecked, login, logout, role, setCurrentPath, staffId, syncFromStorage, token, user]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
