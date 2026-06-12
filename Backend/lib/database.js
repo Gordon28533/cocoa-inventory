@@ -237,6 +237,10 @@ export function createDatabaseManager({ env = process.env, logger = console } = 
         "ALTER TABLE audit_logs ADD COLUMN details TEXT NULL");
       await runIfColumnMissing(db, "requisitions", "rejected_by",
         "ALTER TABLE requisitions ADD COLUMN rejected_by INTEGER NULL");
+      // staffId was added to users after the initial deployment; add it as nullable
+      // so existing rows are not broken, then patch them below.
+      await runIfColumnMissing(db, "users", "staffId",
+        `ALTER TABLE users ADD COLUMN "staffId" VARCHAR(50) DEFAULT ''`);
 
       // ── Initial seed data (idempotent) ────────────────────────────────────
       // Insert default departments if they don't exist yet.
@@ -264,6 +268,14 @@ export function createDatabaseManager({ env = process.env, logger = console } = 
                1
         WHERE NOT EXISTS (SELECT 1 FROM users WHERE "staffName" = 'admin')
       `, []);
+
+      // Patch the admin account: if the row pre-dates the staffId column, it will
+      // have an empty staffId. Ensure it is always set to the canonical value.
+      await db.execute(
+        `UPDATE users SET "staffId" = 'ADMIN001'
+         WHERE "staffName" = 'admin' AND ("staffId" IS NULL OR "staffId" = '')`,
+        []
+      );
 
       logger.log("Schema check complete");
     } catch (error) {
