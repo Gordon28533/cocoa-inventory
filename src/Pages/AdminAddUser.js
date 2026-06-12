@@ -60,6 +60,7 @@ const AdminAddUser = () => {
 
   const [passwordPrompt, setPasswordPrompt] = useState(true);
   const [passwordInput, setPasswordInput] = useState("");
+  const [staffIdInput, setStaffIdInput] = useState(adminStaffId || "");
   const [passwordError, setPasswordError] = useState("");
   const [passwordChecking, setPasswordChecking] = useState(false);
 
@@ -154,8 +155,10 @@ const AdminAddUser = () => {
     setPasswordChecking(true);
 
     try {
-      // Re-authenticate using staffId (the employee number) not staffName
-      const data = await api.login({ staffId: adminStaffId, password: passwordInput });
+      // Re-authenticate using staffId (the employee number) not staffName.
+      // Fall back to staffIdInput for sessions created before staffId was persisted.
+      const effectiveStaffId = adminStaffId || staffIdInput;
+      const data = await api.login({ staffId: effectiveStaffId, password: passwordInput });
 
       if (data.success) {
         setPasswordPrompt(false);
@@ -313,6 +316,21 @@ const AdminAddUser = () => {
           <h2>Admin Password Required</h2>
           <p className="section-subtitle">Confirm your password before opening staff administration tools.</p>
           <form onSubmit={handlePasswordSubmit} className="admin-security-form" aria-busy={passwordChecking}>
+            {!adminStaffId && (
+              <label className="form-group" htmlFor="adminStaffIdInput">
+                <span>Staff ID</span>
+                <input
+                  id="adminStaffIdInput"
+                  name="adminStaffIdInput"
+                  type="text"
+                  placeholder="Enter your Staff ID (e.g. ADMIN001)"
+                  value={staffIdInput}
+                  onChange={(event) => setStaffIdInput(event.target.value)}
+                  required
+                  autoComplete="username"
+                />
+              </label>
+            )}
             <label className="form-group" htmlFor="adminPassword">
               <span>Admin Password</span>
               <input
@@ -336,7 +354,11 @@ const AdminAddUser = () => {
                 <StateNotice tone="error">{passwordError}</StateNotice>
               </div>
             )}
-            <button type="submit" className="btn btn-primary" disabled={passwordChecking || !passwordInput.trim()}>
+            <button
+              type="submit"
+              className="btn btn-primary"
+              disabled={passwordChecking || !passwordInput.trim() || (!adminStaffId && !staffIdInput.trim())}
+            >
               {passwordChecking ? "Checking..." : "Confirm"}
             </button>
           </form>
