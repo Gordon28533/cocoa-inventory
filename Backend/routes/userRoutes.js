@@ -273,15 +273,18 @@ export function createUserRouter({ getDb, requireAdmin, requireDatabase, logAudi
   router.get("/audit-logs", requireAdmin, requireDatabase, async (req, res) => {
     const db = getDb();
 
+    // Allow callers to request up to 1000 rows; default 500.
+    const rawLimit = parseInt(req.query.limit, 10);
+    const limit = (!rawLimit || rawLimit < 1 || rawLimit > 1000) ? 500 : rawLimit;
+
     try {
-      // M-6: Limit logs to 200 most-recent entries; use explicit columns
       const [rows] = await db.execute(
         `SELECT l.id, l.user_id, l.action, l.requisition_id, l.details, l.timestamp,
                 u."staffName"
          FROM audit_logs l
          LEFT JOIN users u ON l.user_id = u.id
          ORDER BY l.timestamp DESC
-         LIMIT 200`
+         LIMIT ${limit}`
       );
       res.json(rows);
     } catch (error) {
