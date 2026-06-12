@@ -6,6 +6,7 @@ import { createAuditLogger } from "./lib/audit.js";
 import { createAuthMiddleware } from "./lib/auth.js";
 import { createDatabaseManager } from "./lib/database.js";
 import { apiNotFoundHandler, createRateLimiter, globalErrorHandler } from "./lib/http.js";
+import { DEV_CORS_ORIGINS } from "./lib/config.js";
 import { createAuthRouter } from "./routes/authRoutes.js";
 import { createUserRouter } from "./routes/userRoutes.js";
 import { createInventoryRouter } from "./routes/inventoryRoutes.js";
@@ -36,7 +37,7 @@ export function createBackendApp({
       ? (env.CORS_ORIGIN || (() => { throw new Error("FATAL: CORS_ORIGIN is not set in production."); })())
           .split(",")
           .map((o) => o.trim())
-      : ["http://localhost:3000", "http://localhost:5001", "http://127.0.0.1:3000"];
+      : DEV_CORS_ORIGINS;
 
   app.use(
     cors({

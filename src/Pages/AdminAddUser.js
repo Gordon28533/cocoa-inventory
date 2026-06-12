@@ -10,17 +10,7 @@ import { useAuth } from "../Context/AuthContext.js";
 import { useDepartments } from "../Context/DepartmentsContext.js";
 import useDocumentTitle from "../hooks/useDocumentTitle.js";
 import { api } from "../utils/api.js";
-
-const ROLE_OPTIONS = [
-  { value: "admin", label: "Admin" },
-  { value: "user", label: "Normal Staff" },
-  { value: "stores", label: "Stores Staff" },
-  { value: "account", label: "Branch Account" },
-  { value: "hod", label: "Head of Department (HOD)" },
-  { value: "deputy_hod", label: "Deputy HOD" },
-  { value: "account_manager", label: "Account Manager" },
-  { value: "it_manager", label: "IT Manager" }
-];
+import { USER_ROLE_OPTIONS as ROLE_OPTIONS } from "../config/constants.js";
 
 const EMPTY_EDIT_FORM = {
   staffName: "",

@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import express from "express";
 import bcrypt from "bcrypt";
+import { BCRYPT_ROUNDS } from "../lib/config.js";
 import {
   badRequest,
   isDuplicateEntryError,
@@ -91,7 +92,7 @@ export function createUserRouter({ getDb, requireAdmin, requireDatabase, logAudi
         if (passwordError) {
           return badRequest(res, passwordError);
         }
-        const hashedPassword = await bcrypt.hash(password, 10);
+        const hashedPassword = await bcrypt.hash(password, BCRYPT_ROUNDS);
         updateFields.push("password = ?");
         params.push(hashedPassword);
       }
@@ -240,7 +241,7 @@ export function createUserRouter({ getDb, requireAdmin, requireDatabase, logAudi
       staffName = staffName.trim();
       staffId   = staffId.trim();
 
-      const hashedPassword = await bcrypt.hash(password, 10);
+      const hashedPassword = await bcrypt.hash(password, BCRYPT_ROUNDS);
       const [result] = await db.query(
         'INSERT INTO users ("staffName", "staffId", password, role, department_id, "isActive") VALUES (?, ?, ?, ?, ?, 1)',
         [staffName, staffId, hashedPassword, role, toNullablePositiveInteger(department_id)]

@@ -1,6 +1,23 @@
 import { clearStoredSession, getStoredSession } from "./session.js";
 
-export const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
+const _rawApiUrl = process.env.REACT_APP_API_URL;
+
+if (!_rawApiUrl && process.env.NODE_ENV === "production") {
+  // Evaluated at build time by CRA's webpack — surfaces in the browser console
+  // and in the Vercel build log so the misconfiguration is impossible to miss.
+  // eslint-disable-next-line no-console
+  console.error(
+    "[cocoa-inventory] CRITICAL: REACT_APP_API_URL is not set. " +
+    "All API requests will fail. Add it to your Vercel project environment variables and redeploy."
+  );
+}
+
+// In development fall back to localhost so engineers can run the app without
+// setting the var. In production an empty string means every request will fail
+// loudly (404 on the same origin) rather than silently hitting a wrong server.
+export const API_BASE_URL =
+  _rawApiUrl ||
+  (process.env.NODE_ENV !== "production" ? "http://localhost:5000" : "");
 
 export const getAuthHeaders = () => {
   const { token } = getStoredSession();

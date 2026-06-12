@@ -1,4 +1,9 @@
 import pg from "pg";
+import {
+  ADMIN_STAFF_NAME,
+  ADMIN_STAFF_ID,
+  ADMIN_PASSWORD_HASH,
+} from "./config.js";
 
 const { Pool } = pg;
 
@@ -258,23 +263,23 @@ export function createDatabaseManager({ env = process.env, logger = console } = 
       `, []);
 
       // Insert default admin user if not present yet.
-      // Password hash is bcrypt of 'admin123'.
+      // Credentials and password hash are read from config.js (env-driven).
+      // Override ADMIN_STAFF_NAME, ADMIN_STAFF_ID, and ADMIN_PASSWORD_HASH in
+      // environment variables to avoid deploying with the default password.
       await db.execute(`
         INSERT INTO users ("staffName", "staffId", password, role, department_id, "isActive")
-        SELECT 'admin', 'ADMIN001',
-               '$2b$10$fw77eZ/awDO2eWah/sOnK.yZzDAAQ13W.zeW4hJpbjfKy4XweRGfW',
-               'admin',
+        SELECT $1, $2, $3, 'admin',
                (SELECT id FROM departments WHERE name = 'Head Office' LIMIT 1),
                1
-        WHERE NOT EXISTS (SELECT 1 FROM users WHERE "staffName" = 'admin')
-      `, []);
+        WHERE NOT EXISTS (SELECT 1 FROM users WHERE "staffName" = $1)
+      `, [ADMIN_STAFF_NAME, ADMIN_STAFF_ID, ADMIN_PASSWORD_HASH]);
 
       // Patch the admin account: if the row pre-dates the staffId column, it will
       // have an empty staffId. Ensure it is always set to the canonical value.
       await db.execute(
-        `UPDATE users SET "staffId" = 'ADMIN001'
-         WHERE "staffName" = 'admin' AND ("staffId" IS NULL OR "staffId" = '')`,
-        []
+        `UPDATE users SET "staffId" = $1
+         WHERE "staffName" = $2 AND ("staffId" IS NULL OR "staffId" = '')`,
+        [ADMIN_STAFF_ID, ADMIN_STAFF_NAME]
       );
 
       logger.log("Schema check complete");

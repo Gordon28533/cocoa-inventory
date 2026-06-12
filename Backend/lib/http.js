@@ -1,7 +1,16 @@
 export function createRateLimiter({ attempts = new Map(), env = process.env } = {}) {
   const isProd = env.NODE_ENV === "production";
-  const windowMs   = isProd ? 15 * 60 * 1000 : 2 * 60 * 1000;
-  const maxAttempts = isProd ? 5 : 20;
+
+  // Allow env-var overrides; fall back to safe per-environment defaults.
+  const _windowRaw = parseInt(env.RATE_LIMIT_WINDOW_MS, 10);
+  const windowMs = Number.isFinite(_windowRaw) && _windowRaw > 0
+    ? _windowRaw
+    : (isProd ? 15 * 60 * 1000 : 2 * 60 * 1000);
+
+  const _maxRaw = parseInt(env.RATE_LIMIT_MAX, 10);
+  const maxAttempts = Number.isFinite(_maxRaw) && _maxRaw > 0
+    ? _maxRaw
+    : (isProd ? 5 : 20);
 
   // M-5: Purge stale entries on every request to prevent unbounded Map growth
   function cleanStaleEntries(now) {

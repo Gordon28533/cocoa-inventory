@@ -1,6 +1,7 @@
 import express from "express";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
+import { BCRYPT_ROUNDS } from "../lib/config.js";
 import {
   badRequest,
   logUnexpectedError,
@@ -151,7 +152,7 @@ export function createAuthRouter({
         return unauthorized(res, "Current password is incorrect.");
       }
 
-      const hashed = await bcrypt.hash(newPassword, 10);
+      const hashed = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
       await db.execute("UPDATE users SET password = ? WHERE id = ?", [hashed, userId]);
 
       // H-5: Audit password changes

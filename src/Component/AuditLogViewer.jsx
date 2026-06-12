@@ -1,9 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import StateNotice from "./ui/StateNotice.jsx";
 import { api } from "../utils/api.js";
+import { PAGE_SIZE_OPTIONS } from "../config/constants.js";
 
 // ─── constants ───────────────────────────────────────────────────────────────
-const PAGE_SIZE_OPTIONS = [10, 25, 50];
 const ALL_ACTIONS = "all";
 
 const formatDate = (ts) =>
