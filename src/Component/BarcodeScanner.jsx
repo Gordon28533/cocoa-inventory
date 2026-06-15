@@ -197,7 +197,6 @@ const BarcodeScanner = ({ onScan, onClose }) => {
       </div>
 
       <div className="barcode-scanner__viewport">
-        {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
         <video
           ref={videoRef}
           className="barcode-scanner__video"
