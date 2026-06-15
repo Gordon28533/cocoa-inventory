@@ -3,12 +3,11 @@ import PropTypes from "prop-types";
 import { Link } from "react-router-dom";
 import { useAuth } from "../Context/AuthContext.js";
 import ConfirmDialog from "./ui/ConfirmDialog.jsx";
+import InventoryForm from "./InventoryForm.jsx";
 import ModalCard from "./ui/ModalCard.jsx";
 import StateNotice from "./ui/StateNotice.jsx";
 import StatusBadge from "./ui/StatusBadge.jsx";
 import { api } from "../utils/api.js";
-
-const INITIAL_ITEM = { id: "", name: "", category: "", type: "", quantity: 0 };
 
 const getStockStatus = (quantity) => {
   if (quantity <= 10) {
@@ -27,13 +26,10 @@ const InventoryList = ({ inventory, setInventory, onEditItem }) => {
   const [sortBy, setSortBy] = useState("name");
   const { role: userRole } = useAuth();
   const [showAddModal, setShowAddModal] = useState(false);
-  const [addItem, setAddItem] = useState(INITIAL_ITEM);
   const [feedbackMessage, setFeedbackMessage] = useState("");
   const [feedbackTone, setFeedbackTone] = useState("neutral");
-  const [addLoading, setAddLoading] = useState(false);
   const [deleteItem, setDeleteItem] = useState(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
-  const addItemFeedbackId = feedbackMessage && showAddModal ? "inventory-add-feedback" : undefined;
 
   const lowStockItems = inventory.filter((item) => item.quantity <= 10);
 
@@ -61,37 +57,6 @@ const InventoryList = ({ inventory, setInventory, onEditItem }) => {
   const showFeedback = (message, tone = "neutral") => {
     setFeedbackMessage(message);
     setFeedbackTone(tone);
-  };
-
-  const closeAddModal = () => {
-    if (addLoading) {
-      return;
-    }
-
-    setShowAddModal(false);
-    setFeedbackMessage("");
-    setAddItem(INITIAL_ITEM);
-  };
-
-  const handleAddItem = async (event) => {
-    event.preventDefault();
-    showFeedback("");
-    setAddLoading(true);
-
-    try {
-      const newItem = await api.createItem(addItem);
-      setInventory((previous) => [...previous, newItem]);
-      showFeedback("Item added successfully!", "success");
-      setAddItem(INITIAL_ITEM);
-      window.setTimeout(() => {
-        setShowAddModal(false);
-        setFeedbackMessage("");
-      }, 1000);
-    } catch (error) {
-      showFeedback(error.message || "Network error. Please try again.", "error");
-    } finally {
-      setAddLoading(false);
-    }
   };
 
   const handleDelete = async () => {
@@ -246,75 +211,11 @@ const InventoryList = ({ inventory, setInventory, onEditItem }) => {
       )}
 
       {showAddModal && (
-        <ModalCard title="Add New Item" onClose={closeAddModal}>
-          <form
-            className="inventory-modal-form"
-            onSubmit={handleAddItem}
-            aria-busy={addLoading}
-            aria-describedby={addItemFeedbackId}
-          >
-            <label className="form-group">
-              <span>Item ID</span>
-              <input
-                type="text"
-                value={addItem.id}
-                onChange={(event) => setAddItem({ ...addItem, id: event.target.value })}
-                required
-              />
-            </label>
-            <label className="form-group">
-              <span>Name</span>
-              <input
-                type="text"
-                value={addItem.name}
-                onChange={(event) => setAddItem({ ...addItem, name: event.target.value })}
-                required
-              />
-            </label>
-            <label className="form-group">
-              <span>Category</span>
-              <input
-                type="text"
-                value={addItem.category}
-                onChange={(event) => setAddItem({ ...addItem, category: event.target.value })}
-                required
-              />
-            </label>
-            <label className="form-group">
-              <span>Type</span>
-              <input
-                type="text"
-                value={addItem.type}
-                onChange={(event) => setAddItem({ ...addItem, type: event.target.value })}
-                required
-              />
-            </label>
-            <label className="form-group">
-              <span>Quantity</span>
-              <input
-                type="number"
-                value={addItem.quantity}
-                onChange={(event) => setAddItem({ ...addItem, quantity: Number.parseInt(event.target.value, 10) || 0 })}
-                required
-                min={0}
-              />
-            </label>
-
-            {feedbackMessage && showAddModal && (
-              <div id="inventory-add-feedback">
-                <StateNotice tone={feedbackTone}>{feedbackMessage}</StateNotice>
-              </div>
-            )}
-
-            <div className="modal-actions">
-              <button type="submit" disabled={addLoading} className="btn btn-primary">
-                {addLoading ? "Adding..." : "Add Item"}
-              </button>
-              <button type="button" onClick={closeAddModal} className="btn btn-secondary" disabled={addLoading}>
-                Cancel
-              </button>
-            </div>
-          </form>
+        <ModalCard title="Add New Item" onClose={() => setShowAddModal(false)}>
+          <InventoryForm
+            setInventory={setInventory}
+            onCancel={() => setShowAddModal(false)}
+          />
         </ModalCard>
       )}
 
