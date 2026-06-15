@@ -14,20 +14,33 @@ const ModalCard = ({ title, children, minWidth = 320, maxWidth = 520, onClose, c
   const modalRef = useRef(null);
   const returnFocusRef = useRef(null);
 
+  // Focus the first focusable element on mount; restore focus on unmount.
+  // Empty dependency array — intentional. Re-running this on every render
+  // (e.g. when the parent passes a new inline `onClose` function) would call
+  // firstFocusable.focus() on every keystroke and steal focus from whichever
+  // field the user is currently typing in.
   useEffect(() => {
     const modalNode = modalRef.current;
+    if (!modalNode) return undefined;
 
-    if (!modalNode) {
-      return undefined;
-    }
-
-    returnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    returnFocusRef.current =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
 
     const focusable = modalNode.querySelectorAll(FOCUSABLE_SELECTOR);
-    const firstFocusable = focusable[0];
-    const lastFocusable = focusable[focusable.length - 1];
+    focusable[0]?.focus();
 
-    firstFocusable?.focus();
+    return () => {
+      returnFocusRef.current?.focus?.();
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Keyboard trap: Escape → close; Tab → cycle through focusable elements.
+  // Depends on `onClose` so the handler always holds the current callback.
+  // Querying focusable inside the handler keeps the list fresh if modal
+  // content changes while it is open.
+  useEffect(() => {
+    const modalNode = modalRef.current;
+    if (!modalNode) return undefined;
 
     const handleKeyDown = (event) => {
       if (event.key === "Escape" && onClose) {
@@ -36,9 +49,13 @@ const ModalCard = ({ title, children, minWidth = 320, maxWidth = 520, onClose, c
         return;
       }
 
-      if (event.key !== "Tab" || focusable.length === 0) {
-        return;
-      }
+      if (event.key !== "Tab") return;
+
+      const focusable = modalNode.querySelectorAll(FOCUSABLE_SELECTOR);
+      if (focusable.length === 0) return;
+
+      const firstFocusable = focusable[0];
+      const lastFocusable  = focusable[focusable.length - 1];
 
       if (event.shiftKey && document.activeElement === firstFocusable) {
         event.preventDefault();
@@ -50,11 +67,7 @@ const ModalCard = ({ title, children, minWidth = 320, maxWidth = 520, onClose, c
     };
 
     modalNode.addEventListener("keydown", handleKeyDown);
-
-    return () => {
-      modalNode.removeEventListener("keydown", handleKeyDown);
-      returnFocusRef.current?.focus?.();
-    };
+    return () => modalNode.removeEventListener("keydown", handleKeyDown);
   }, [onClose]);
 
   return (
