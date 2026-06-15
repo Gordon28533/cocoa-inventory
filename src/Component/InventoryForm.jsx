@@ -5,7 +5,9 @@ import stationeryStock from "../data/stationeryStock";
 import generalStock from "../data/generalStock";
 import { useAuth } from "../Context/AuthContext.js";
 import StateNotice from "./ui/StateNotice.jsx";
+import BarcodeScanner from "./BarcodeScanner.jsx";
 import { api } from "../utils/api.js";
+import { ITEM_TYPES } from "../config/constants.js";
 
 const EMPTY_ITEM = { id: "", name: "", category: "", type: "", quantity: 0 };
 
@@ -16,6 +18,18 @@ const normalizeItem = (item = {}) => ({
   type:     item.type     || "",
   quantity: Number(item.quantity) || 0
 });
+
+// All items across every category — used by the barcode scanner lookup
+const ALL_STOCK = [...tonerStock, ...stationeryStock, ...generalStock];
+
+// Derive category from item-ID prefix (for barcode auto-detect)
+const categoryFromId = (id = "") => {
+  const upper = id.toUpperCase();
+  if (upper.startsWith("COM-")) return "Toner Stock";
+  if (upper.startsWith("STA-")) return "Stationery Stock";
+  if (upper.startsWith("GEN-")) return "General Stock";
+  return "";
+};
 
 /**
  * @param {boolean} showPreview  L-3: Opt-in preview panel. Defaults to false to
@@ -30,10 +44,11 @@ const InventoryForm = ({
   showPreview    = false
 }) => {
   const { token } = useAuth();
-  const [item, setItem]             = useState(() => normalizeItem(initialItem || EMPTY_ITEM));
+  const [item, setItem]               = useState(() => normalizeItem(initialItem || EMPTY_ITEM));
   const [fetchedItems, setFetchedItems] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [message, setMessage]       = useState("");
+  const [message, setMessage]         = useState("");
+  const [showScanner, setShowScanner] = useState(false);
 
   const categoryHelpId = "inventory-form-category-help";
   const quantityHelpId = "inventory-form-quantity-help";
@@ -73,12 +88,19 @@ const InventoryForm = ({
     return () => clearTimeout(id);
   }, [message]);
 
+  // Items available in the currently-selected category
   const stockOptions = useMemo(() => {
-    if (item.category === "Toner Stock")     return tonerStock;
+    if (item.category === "Toner Stock")      return tonerStock;
     if (item.category === "Stationery Stock") return stationeryStock;
-    if (item.category === "General Stock")   return generalStock;
+    if (item.category === "General Stock")    return generalStock;
     return [];
   }, [item.category]);
+
+  // Type options for the currently-selected category
+  const typeOptions = useMemo(
+    () => ITEM_TYPES[item.category] || [],
+    [item.category]
+  );
 
   const updateItem = (field, value) => {
     setItem((current) => ({ ...current, [field]: value }));
@@ -87,6 +109,57 @@ const InventoryForm = ({
   const resetForm = () => {
     setItem(normalizeItem(initialItem || EMPTY_ITEM));
     setMessage("");
+  };
+
+  // ── Barcode scanner ────────────────────────────────────────────────────────
+  /**
+   * Called when the scanner reads a barcode.
+   * Strategy:
+   *   1. Try exact match against item ID in the stock lists.
+   *   2. Detect category from ID prefix and pre-fill category.
+   *   3. If no match, put the raw code in the ID field so the user can verify.
+   */
+  const handleBarcodeScanned = (rawCode) => {
+    setShowScanner(false);
+    const code  = rawCode.trim().toUpperCase();
+    const match = ALL_STOCK.find((s) => s.id === code);
+
+    if (match) {
+      setItem((current) => ({
+        ...current,
+        id:       match.id,
+        name:     match.name,
+        category: match.category,
+        // Reset type so user picks from the now-correct options
+        type: "",
+      }));
+      setMessage(`✓ Barcode matched: ${match.id} — ${match.name}`);
+    } else {
+      // Unknown barcode — fill ID field, detect category from prefix
+      const detectedCategory = categoryFromId(code);
+      setItem((current) => ({
+        ...current,
+        id:       rawCode.trim(),
+        name:     "",
+        category: detectedCategory || current.category,
+        type:     "",
+      }));
+      setMessage(
+        `Barcode "${rawCode.trim()}" not found in stock list. ` +
+        "Please verify the Item ID and fill in the remaining fields."
+      );
+    }
+  };
+
+  // ── Name field: sync Item ID when user selects a name from the datalist ────
+  const handleNameChange = (event) => {
+    const val   = event.target.value;
+    const match = stockOptions.find((s) => s.name === val);
+    if (match) {
+      setItem((current) => ({ ...current, name: match.name, id: match.id }));
+    } else {
+      updateItem("name", val);
+    }
   };
 
   const handleSubmit = async (event) => {
@@ -102,7 +175,6 @@ const InventoryForm = ({
         setInventory?.((previous) => [...previous, newItem]);
         setMessage("Item added successfully!");
         setItem(normalizeItem(EMPTY_ITEM));
-        // Note: the auto-dismiss effect above handles clearing the message
       }
     } catch (error) {
       setMessage(error.message || "Network error. Please check your connection.");
@@ -112,18 +184,49 @@ const InventoryForm = ({
     }
   };
 
+  // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div>
       {message && (
         <div id="inventory-form-message">
-          <StateNotice tone={message.toLowerCase().includes("success") ? "success" : "error"}>
+          <StateNotice tone={message.toLowerCase().includes("success") || message.startsWith("✓") ? "success" : "error"}>
             {message}
           </StateNotice>
         </div>
       )}
 
+      {/* ── Barcode Scanner modal ── */}
+      {showScanner && (
+        <div className="barcode-scanner-modal" role="dialog" aria-modal="true" aria-label="Barcode scanner">
+          <BarcodeScanner
+            onScan={handleBarcodeScanned}
+            onClose={() => setShowScanner(false)}
+          />
+        </div>
+      )}
+
       <form onSubmit={handleSubmit} aria-label={isEdit ? "Edit inventory item form" : "Add inventory item form"}>
+
+        {/* ── Scan button (add mode only) ── */}
+        {!isEdit && (
+          <div className="barcode-scan-row">
+            <button
+              type="button"
+              className="btn btn-secondary barcode-scan-btn"
+              onClick={() => setShowScanner(true)}
+              disabled={isSubmitting || showScanner}
+              title="Open camera to scan an item barcode"
+            >
+              <span aria-hidden="true">📷</span> Scan Barcode
+            </button>
+            <span className="barcode-scan-hint">
+              Scan to auto-fill Item ID &amp; Name
+            </span>
+          </div>
+        )}
+
         <div className="form-row">
+          {/* ── Category ── */}
           <div className="form-group">
             <label htmlFor="category">Category *</label>
             <select
@@ -133,7 +236,8 @@ const InventoryForm = ({
                 ...current,
                 category: event.target.value,
                 id:   isEdit ? current.id   : "",
-                name: isEdit ? current.name : ""
+                name: isEdit ? current.name : "",
+                type: "",          // reset type when category changes
               }))}
               required
               disabled={isSubmitting || isEdit}
@@ -149,6 +253,7 @@ const InventoryForm = ({
             </span>
           </div>
 
+          {/* ── Item ID ── */}
           <div className="form-group">
             <label htmlFor="itemId">Item ID *</label>
             {isEdit ? (
@@ -162,7 +267,7 @@ const InventoryForm = ({
                   setItem((current) => ({
                     ...current,
                     id:   selected ? selected.id   : "",
-                    name: selected ? selected.name : ""
+                    name: selected ? selected.name : "",
                   }));
                 }}
                 required
@@ -170,7 +275,7 @@ const InventoryForm = ({
               >
                 <option value="">Select Item ID</option>
                 {stockOptions.map((s) => (
-                  <option key={s.id} value={s.id}>{s.id} - {s.name}</option>
+                  <option key={s.id} value={s.id}>{s.id} — {s.name}</option>
                 ))}
               </select>
             )}
@@ -178,34 +283,61 @@ const InventoryForm = ({
         </div>
 
         <div className="form-row">
+          {/* ── Item Name (searchable datalist) ── */}
           <div className="form-group">
             <label htmlFor="name">Item Name *</label>
             <input
               id="name"
               type="text"
-              placeholder="Enter item name"
+              list="inventory-name-options"
+              placeholder={item.category ? "Type or select item name" : "Select a category first"}
               value={item.name}
-              onChange={(event) => updateItem("name", event.target.value)}
+              onChange={handleNameChange}
               required
               disabled={isSubmitting}
+              autoComplete="off"
             />
+            {/* Datalist provides filtered suggestions as the user types */}
+            <datalist id="inventory-name-options">
+              {stockOptions.map((s) => (
+                <option key={s.id} value={s.name} label={`${s.id} — ${s.name}`} />
+              ))}
+            </datalist>
           </div>
 
+          {/* ── Type (per-category dropdown) ── */}
           <div className="form-group">
             <label htmlFor="type">Type *</label>
-            <input
-              id="type"
-              type="text"
-              placeholder="Enter item type"
-              value={item.type}
-              onChange={(event) => updateItem("type", event.target.value)}
-              required
-              disabled={isSubmitting}
-            />
+            {typeOptions.length > 0 ? (
+              <select
+                id="type"
+                value={item.type}
+                onChange={(event) => updateItem("type", event.target.value)}
+                required
+                disabled={isSubmitting || !item.category}
+              >
+                <option value="">Select Type</option>
+                {typeOptions.map((t) => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </select>
+            ) : (
+              // Fallback free-text when no category is selected yet
+              <input
+                id="type"
+                type="text"
+                placeholder="Select a category first"
+                value={item.type}
+                onChange={(event) => updateItem("type", event.target.value)}
+                required
+                disabled={isSubmitting || !item.category}
+              />
+            )}
           </div>
         </div>
 
         <div className="form-row">
+          {/* ── Quantity ── */}
           <div className="form-group">
             <label htmlFor="quantity">Quantity *</label>
             <input

@@ -42,3 +42,36 @@ export const DEFAULT_PAGE_SIZE = 25;
 
 /** Default reorder-level applied to new inventory items. */
 export const DEFAULT_REORDER_LEVEL = 10;
+
+/**
+ * Item type options available in the Type dropdown, keyed by category name.
+ * Each entry is an ordered array of strings shown in the <select>.
+ * The empty-string sentinel ("") is added automatically by the form.
+ */
+export const ITEM_TYPES = {
+  "Toner Stock": [
+    "HP Toner Cartridge",
+    "Printer Ribbon",
+    "Inkjet Cartridge",
+    "Other",
+  ],
+  "Stationery Stock": [
+    "Record Book",
+    "Writing Instrument",
+    "Paper & Pads",
+    "Envelope",
+    "File & Folder",
+    "Stapler & Fasteners",
+    "Office Equipment",
+    "Office Form",
+    "Rubber Stamp Supplies",
+    "Adhesive & Tape",
+    "Other",
+  ],
+  "General Stock": [
+    "PPE",
+    "Cleaning & Hygiene",
+    "Safety Equipment",
+    "Other",
+  ],
+};

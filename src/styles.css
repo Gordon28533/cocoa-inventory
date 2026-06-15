@@ -2209,3 +2209,159 @@ tr:hover {
     font-size: 1.3rem;
   }
 }
+
+/* ─── Barcode scan row (above the form) ────────────────────────────────────── */
+.barcode-scan-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.barcode-scan-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  white-space: nowrap;
+}
+
+.barcode-scan-hint {
+  font-size: 0.8rem;
+  color: #6b7280;
+}
+
+/* ─── Barcode scanner modal overlay ────────────────────────────────────────── */
+.barcode-scanner-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+}
+
+/* ─── Scanner card ──────────────────────────────────────────────────────────── */
+.barcode-scanner {
+  background: #1a1a2e;
+  color: #e2e8f0;
+  border-radius: 12px;
+  padding: 1.25rem;
+  width: 100%;
+  max-width: 420px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.barcode-scanner__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.barcode-scanner__label {
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.barcode-scanner__close {
+  flex-shrink: 0;
+  font-size: 0.78rem;
+  padding: 0.25rem 0.6rem;
+}
+
+/* ─── Video viewport ────────────────────────────────────────────────────────── */
+.barcode-scanner__viewport {
+  position: relative;
+  background: #000;
+  border-radius: 8px;
+  overflow: hidden;
+  aspect-ratio: 4 / 3;
+}
+
+.barcode-scanner__video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* ─── Crosshair overlay ─────────────────────────────────────────────────────── */
+.barcode-scanner__overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.barcode-scanner__crosshair {
+  width: 70%;
+  height: 40%;
+  border: 2px solid rgba(74, 222, 128, 0.9);
+  border-radius: 6px;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.35);
+  animation: barcode-pulse 2s ease-in-out infinite;
+}
+
+@keyframes barcode-pulse {
+  0%, 100% { border-color: rgba(74, 222, 128, 0.9); }
+  50%       { border-color: rgba(74, 222, 128, 0.4); }
+}
+
+/* ─── Hint text ─────────────────────────────────────────────────────────────── */
+.barcode-scanner__hint {
+  font-size: 0.82rem;
+  color: #94a3b8;
+  text-align: center;
+  margin: 0;
+}
+
+/* ─── Unsupported / error states ────────────────────────────────────────────── */
+.barcode-scanner--unsupported,
+.barcode-scanner--error {
+  background: #fff;
+  color: #1e293b;
+  text-align: center;
+  gap: 0.75rem;
+}
+
+.barcode-scanner__icon {
+  font-size: 2.5rem;
+  line-height: 1;
+}
+
+.barcode-scanner__title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.barcode-scanner__body {
+  font-size: 0.88rem;
+  color: #475569;
+  margin: 0;
+}
+
+.barcode-scanner__actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+}
+
+/* ─── Responsive tweaks ─────────────────────────────────────────────────────── */
+@media (max-width: 480px) {
+  .barcode-scanner {
+    max-width: 100%;
+    border-radius: 0;
+  }
+  .barcode-scanner-modal {
+    padding: 0;
+    align-items: flex-end;
+  }
+}
