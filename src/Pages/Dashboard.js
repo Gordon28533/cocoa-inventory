@@ -8,6 +8,7 @@ import InventoryList from "../Component/InventoryList.jsx";
 import AuditLogViewer from "../Component/AuditLogViewer.jsx";
 import MyRequisitions from "../Component/MyRequisitions.jsx";
 import DepartmentManager from "../Component/DepartmentManager.jsx";
+import NotificationsPanel from "../Component/NotificationsPanel.jsx";
 import ModalCard from "../Component/ui/ModalCard.jsx";
 import { useAuth } from "../Context/AuthContext.js";
 import useDocumentTitle from "../hooks/useDocumentTitle.js";
@@ -16,7 +17,7 @@ import "../styles.css";
 
 const APPROVER_ROLES = ["account", "hod", "deputy_hod", "it_manager", "account_manager"];
 const NON_REQUESTER_ROLES = [...APPROVER_ROLES, "stores"];
-const DASHBOARD_TABS = ["inventory", "requisition", "myreq", "approval", "fulfill", "audit", "departments"];
+const DASHBOARD_TABS = ["inventory", "notifications", "requisition", "myreq", "approval", "fulfill", "audit", "departments"];
 
 const inferNotificationTone = (message) => {
   const normalizedMessage = String(message || "").toLowerCase();
@@ -67,11 +68,14 @@ const Dashboard = ({
   useDocumentTitle("Workspace");
 
   const tabButtons = useMemo(() => {
-    const tabs = [{ key: "inventory", label: "Inventory List" }];
+    const tabs = [
+      { key: "inventory",      label: "Inventory List" },
+      { key: "notifications",  label: "Notifications"  },
+    ];
 
     if (canRequest) {
       tabs.push({ key: "requisition", label: "Requisition" });
-      tabs.push({ key: "myreq", label: "My Requisitions" });
+      tabs.push({ key: "myreq",       label: "My Requisitions" });
     }
 
     if (isApprover) {
@@ -83,7 +87,7 @@ const Dashboard = ({
     }
 
     if (isAdmin) {
-      tabs.push({ key: "audit", label: "Audit Logs" });
+      tabs.push({ key: "audit",       label: "Audit Logs" });
       tabs.push({ key: "departments", label: "Departments" });
     }
 
@@ -259,6 +263,18 @@ const Dashboard = ({
             </ModalCard>
           )}
         </section>
+      )}
+
+      {activeTab === "notifications" && (
+        <div
+          className="form-container"
+          id={getPanelId("notifications")}
+          role="tabpanel"
+          aria-labelledby={getTabId("notifications")}
+          tabIndex={0}
+        >
+          <NotificationsPanel inventory={inventory} />
+        </div>
       )}
 
       {activeTab === "requisition" && canRequest && (

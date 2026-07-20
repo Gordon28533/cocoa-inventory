@@ -1021,6 +1021,95 @@ tr:hover {
   margin-bottom: 6px;
 }
 
+/* ── NotificationsPanel ─────────────────────────────────────────────────────── */
+.notif-section {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 20px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.04);
+}
+
+.notif-section__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 14px;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.notif-section__sub {
+  font-size: 0.8rem;
+  font-weight: 400;
+  color: var(--color-text-muted);
+}
+
+.notif-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 10px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1;
+  background: var(--color-text-muted);
+  color: #fff;
+}
+
+.notif-badge--danger  { background: var(--color-danger); }
+.notif-badge--warning { background: #b7791f; }
+
+.notif-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.notif-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  border-left-width: 3px;
+  border-left-color: var(--color-border-strong);
+}
+
+.notif-item--danger  { border-left-color: var(--color-danger); }
+.notif-item--warning { border-left-color: #b7791f; }
+
+.notif-item__body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.notif-item__title {
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.notif-item__sub {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+}
+
 .filter-toolbar {
   display: flex;
   gap: 16px;
@@ -2364,4 +2453,28 @@ tr:hover {
     padding: 0;
     align-items: flex-end;
   }
+}
+
+/* ─── Audit log table — responsive scroll ───────────────────────────────────── */
+.audit-table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.audit-table {
+  min-width: 640px;
+  width: 100%;
+  border-collapse: collapse;
+}
+
+/* ─── Approval card item table — responsive scroll ──────────────────────────── */
+.approval-card__table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.approval-card__table {
+  min-width: 380px;
+  width: 100%;
+  border-collapse: collapse;
 }
