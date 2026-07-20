@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import PropTypes from "prop-types";
 import { useAuth } from "./AuthContext.js";
 import { api } from "../utils/api.js";
@@ -13,7 +13,7 @@ export const DepartmentsProvider = ({ children }) => {
   const [error, setError] = useState("");
   const { token } = useAuth();
 
-  const refreshDepartments = async () => {
+  const refreshDepartments = useCallback(async () => {
     if (!token) {
       setDepartments([]);
       setError("");
@@ -32,14 +32,19 @@ export const DepartmentsProvider = ({ children }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [token]);
 
   useEffect(() => {
     refreshDepartments();
-  }, [token]);
+  }, [refreshDepartments]);
+
+  const contextValue = useMemo(
+    () => ({ departments, loading, error, refreshDepartments }),
+    [departments, loading, error, refreshDepartments]
+  );
 
   return (
-    <DepartmentsContext.Provider value={{ departments, loading, error, refreshDepartments }}>
+    <DepartmentsContext.Provider value={contextValue}>
       {children}
     </DepartmentsContext.Provider>
   );

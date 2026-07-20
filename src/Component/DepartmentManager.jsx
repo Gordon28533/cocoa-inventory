@@ -105,7 +105,7 @@ const DepartmentManager = ({ setNotification }) => {
             type="text"
             placeholder="Department name"
             value={newDept.name}
-            onChange={(event) => setNewDept({ ...newDept, name: event.target.value })}
+            onChange={(event) => setNewDept((prev) => ({ ...prev, name: event.target.value }))}
             required
             aria-describedby={addDepartmentDescription || undefined}
           />
@@ -116,7 +116,7 @@ const DepartmentManager = ({ setNotification }) => {
             type="text"
             placeholder="Description (optional)"
             value={newDept.description}
-            onChange={(event) => setNewDept({ ...newDept, description: event.target.value })}
+            onChange={(event) => setNewDept((prev) => ({ ...prev, description: event.target.value }))}
             aria-describedby={addDepartmentDescription || undefined}
           />
         </label>
@@ -152,7 +152,7 @@ const DepartmentManager = ({ setNotification }) => {
                       <input
                         type="text"
                         value={editDept.name}
-                        onChange={(event) => setEditDept({ ...editDept, name: event.target.value })}
+                        onChange={(event) => setEditDept((prev) => ({ ...prev, name: event.target.value }))}
                         required
                       />
                     ) : (
@@ -164,7 +164,7 @@ const DepartmentManager = ({ setNotification }) => {
                       <input
                         type="text"
                         value={editDept.description}
-                        onChange={(event) => setEditDept({ ...editDept, description: event.target.value })}
+                        onChange={(event) => setEditDept((prev) => ({ ...prev, description: event.target.value }))}
                       />
                     ) : (
                       dept.description || <span className="muted-text">No description</span>

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import PropTypes from "prop-types";
 import { useAuth } from "../Context/AuthContext.js";
 import StateNotice from "./ui/StateNotice.jsx";
@@ -36,17 +36,22 @@ const RequisitionFulfill = ({ setNotification, inventory }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [receiverId, setReceiverId] = useState("");
   const { token } = useAuth();
+  const feedbackTimerRef = useRef(null);
+
+  // Clear notification timer on unmount to prevent state updates on unmounted component.
+  useEffect(() => () => { if (feedbackTimerRef.current) clearTimeout(feedbackTimerRef.current); }, []);
 
   const showFeedback = (nextMessage) => {
     setMessage(nextMessage);
 
     if (setNotification) {
       setNotification(nextMessage);
-      setTimeout(() => setNotification(""), 3000);
+      if (feedbackTimerRef.current) clearTimeout(feedbackTimerRef.current);
+      feedbackTimerRef.current = setTimeout(() => setNotification(""), 3000);
     }
   };
 
-  const fetchBatches = async () => {
+  const fetchBatches = useCallback(async () => {
     setIsLoading(true);
 
     try {
@@ -73,7 +78,7 @@ const RequisitionFulfill = ({ setNotification, inventory }) => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     if (!token) {
@@ -84,7 +89,7 @@ const RequisitionFulfill = ({ setNotification, inventory }) => {
     }
 
     fetchBatches();
-  }, [token]);
+  }, [token, fetchBatches]);
 
   const readyBatchIds = useMemo(() => new Set(readyBatches.map((currentBatch) => currentBatch[0].batch_id)), [readyBatches]);
 

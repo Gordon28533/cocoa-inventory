@@ -88,14 +88,17 @@ export const AuthProvider = ({ children }) => {
     };
 
     window.addEventListener("storage", handleStateSync);
-    window.addEventListener("focus", handleStateSync);
+    // NOTE: "focus" listener removed — it fired on every window/tab focus event
+    // (including virtual-keyboard show/hide on mobile), calling syncFromStorage()
+    // which issues 6 setState calls → tree-wide re-renders → per-keystroke focus
+    // loss in text fields. "storage" + AUTH_STATE_CHANGED_EVENT are sufficient
+    // for cross-tab auth sync.
     window.addEventListener(AUTH_STATE_CHANGED_EVENT, handleStateSync);
 
     handleStateSync();
 
     return () => {
       window.removeEventListener("storage", handleStateSync);
-      window.removeEventListener("focus", handleStateSync);
       window.removeEventListener(AUTH_STATE_CHANGED_EVENT, handleStateSync);
     };
   }, [syncFromStorage]);

@@ -31,6 +31,7 @@ const RequisitionForm = ({ inventory, setNotification }) => {
 
   const { departments, loading: deptLoading, error: deptLoadError } = useDepartments();
   const { departmentId: userDeptId } = useAuth();
+  const notifTimerRef = useRef(null);
 
   useEffect(() => {
     if (userDeptId) setDepartmentId(String(userDeptId));
@@ -39,6 +40,10 @@ const RequisitionForm = ({ inventory, setNotification }) => {
   useEffect(() => {
     if (uniqueCode) successRef.current?.focus();
   }, [uniqueCode]);
+
+  // Clear notification timer on unmount — prevents calling setNotification("") on
+  // an unmounted component (e.g. user navigates away before the 3 s timeout fires).
+  useEffect(() => () => { if (notifTimerRef.current) clearTimeout(notifTimerRef.current); }, []);
 
   const categories = useMemo(
     () => [...new Set(inventory.map((i) => i.category).filter(Boolean))].sort(),
@@ -65,7 +70,8 @@ const RequisitionForm = ({ inventory, setNotification }) => {
   const showNotification = (msg, ms = 3000) => {
     if (!setNotification) return;
     setNotification(msg);
-    setTimeout(() => setNotification(""), ms);
+    if (notifTimerRef.current) clearTimeout(notifTimerRef.current);
+    notifTimerRef.current = setTimeout(() => setNotification(""), ms);
   };
 
   const handleDeptChange = (e) => {

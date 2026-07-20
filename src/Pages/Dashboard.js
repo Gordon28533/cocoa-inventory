@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import PropTypes from "prop-types";
 import InventoryForm from "../Component/InventoryForm.jsx";
 import RequisitionForm from "../Component/RequisitionForm.jsx";
@@ -122,7 +122,10 @@ const Dashboard = ({
   const getTabId = (tab) => `dashboard-tab-${tab}`;
   const getPanelId = (tab) => `dashboard-panel-${tab}`;
 
-  const showNotification = (nextNotification) => {
+  // Stable callback — safe to pass as a prop to memoized children without
+  // causing unnecessary re-renders. setNotification from useState is already
+  // stable; inferNotificationTone is at module scope.
+  const showNotification = useCallback((nextNotification) => {
     if (!nextNotification) {
       setNotification({ message: "", tone: "success" });
       return;
@@ -141,7 +144,7 @@ const Dashboard = ({
       message: nextMessage,
       tone: nextNotification.tone || inferNotificationTone(nextMessage)
     });
-  };
+  }, []);
 
   const handleEditSubmit = async (updatedItem) => {
     try {
@@ -162,7 +165,10 @@ const Dashboard = ({
 
     const timeoutId = window.setTimeout(() => setNotification({ message: "", tone: "success" }), 3000);
     return () => window.clearTimeout(timeoutId);
-  }, [notification]);
+  // Depend on the message string, not the whole notification object — the
+  // object reference changes on every setNotification call even when the
+  // message hasn't actually changed.
+  }, [notification.message]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (isLoading) {
     return (

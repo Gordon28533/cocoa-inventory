@@ -62,6 +62,7 @@ const RequisitionApproval = () => {
   const [rejectReason, setRejectReason] = useState("");
   const [isRejecting, setIsRejecting] = useState(false);
   const rejectTextareaRef = useRef(null);
+  const noticeTimerRef    = useRef(null);
 
   // search / filter
   const [search, setSearch] = useState("");
@@ -89,10 +90,14 @@ const RequisitionApproval = () => {
     if (rejectingBatchId) rejectTextareaRef.current?.focus();
   }, [rejectingBatchId]);
 
+  // Clear notice timer on unmount to avoid state updates on an unmounted component.
+  useEffect(() => () => { if (noticeTimerRef.current) clearTimeout(noticeTimerRef.current); }, []);
+
   // ── notice helper ─────────────────────────────────────────────────────
   const showNotice = (msg, tone = "success") => {
+    if (noticeTimerRef.current) clearTimeout(noticeTimerRef.current);
     setNotice({ msg, tone });
-    setTimeout(() => setNotice({ msg: "", tone: "success" }), 4000);
+    noticeTimerRef.current = setTimeout(() => setNotice({ msg: "", tone: "success" }), 4000);
   };
 
   // ── approve ───────────────────────────────────────────────────────────
