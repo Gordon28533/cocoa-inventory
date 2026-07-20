@@ -10,7 +10,22 @@ import { useAuth } from "../Context/AuthContext.js";
 import { useDepartments } from "../Context/DepartmentsContext.js";
 import useDocumentTitle from "../hooks/useDocumentTitle.js";
 import { api } from "../utils/api.js";
+import { getBatchStatusMeta } from "../utils/requisitionStatus.js";
 import { USER_ROLE_OPTIONS as ROLE_OPTIONS } from "../config/constants.js";
+
+// ── Report thresholds (kept in sync with NotificationsPanel.jsx / StockAlert.jsx)
+const LOW_THRESHOLD    = 10;
+const MEDIUM_THRESHOLD = 30;
+
+const groupByBatch = (rows) => {
+  const map = new Map();
+  for (const row of rows) {
+    const key = row.batch_id || `no-batch-${row.id}`;
+    if (!map.has(key)) map.set(key, []);
+    map.get(key).push(row);
+  }
+  return [...map.values()];
+};
 
 const EMPTY_EDIT_FORM = {
   staffName: "",
@@ -68,6 +83,10 @@ const AdminAddUser = () => {
   const [changePwConfirm, setChangePwConfirm] = useState("");
   const [changePwMsg, setChangePwMsg] = useState("");
   const [changePwLoading, setChangePwLoading] = useState(false);
+
+  const [reportItems, setReportItems] = useState([]);
+  const [reportRequisitions, setReportRequisitions] = useState([]);
+  const [reportLoading, setReportLoading] = useState(false);
   const adminPasswordHelpId = "admin-password-help";
   const adminPasswordErrorId = passwordError ? "admin-password-error" : undefined;
   const adminPasswordDescription = [adminPasswordHelpId, adminPasswordErrorId].filter(Boolean).join(" ");
@@ -82,6 +101,28 @@ const AdminAddUser = () => {
   const messageTone = useMemo(() => getMessageTone(message), [message]);
   const changePasswordTone = useMemo(() => getMessageTone(changePwMsg), [changePwMsg]);
 
+  const reportStats = useMemo(() => {
+    const totalItems  = reportItems.length;
+    const lowStock    = reportItems.filter((i) => i.quantity <= LOW_THRESHOLD).length;
+    const mediumStock = reportItems.filter(
+      (i) => i.quantity > LOW_THRESHOLD && i.quantity <= MEDIUM_THRESHOLD
+    ).length;
+
+    const batches        = groupByBatch(reportRequisitions);
+    const pendingCount   = batches.filter((items) => {
+      const meta = getBatchStatusMeta(items);
+      return meta.label !== "Fulfilled" && meta.label !== "Rejected";
+    }).length;
+    const fulfilledCount = batches.filter((items) => getBatchStatusMeta(items).label === "Fulfilled").length;
+
+    const byRole = {};
+    for (const u of users) {
+      byRole[u.role] = (byRole[u.role] || 0) + 1;
+    }
+
+    return { totalItems, lowStock, mediumStock, pendingCount, fulfilledCount, byRole, totalUsers: users.length };
+  }, [reportItems, reportRequisitions, users]);
+
   useDocumentTitle("User Management");
 
   useEffect(() => {
@@ -93,8 +134,9 @@ const AdminAddUser = () => {
   useEffect(() => {
     if (!passwordPrompt) {
       fetchUsers();
+      fetchReportData();
     }
-  }, [passwordPrompt]);
+  }, [passwordPrompt]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -107,6 +149,22 @@ const AdminAddUser = () => {
       console.error("Fetch users exception:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchReportData = async () => {
+    setReportLoading(true);
+    try {
+      const [itemsData, reqData] = await Promise.all([
+        api.getItems(),
+        api.getRequisitions()
+      ]);
+      setReportItems(Array.isArray(itemsData) ? itemsData : (itemsData?.items ?? []));
+      setReportRequisitions(Array.isArray(reqData) ? reqData : (reqData?.requisitions ?? []));
+    } catch (error) {
+      console.error("Failed to load report data:", error);
+    } finally {
+      setReportLoading(false);
     }
   };
 
@@ -561,6 +619,67 @@ const AdminAddUser = () => {
               </tbody>
             </table>
           </div>
+        )}
+      </section>
+
+      <section className="feature-card">
+        <div className="feature-card__header">
+          <div>
+            <h3>System Reports</h3>
+            <p className="section-subtitle">Aggregate snapshot of inventory, requisitions, and user accounts.</p>
+          </div>
+          <button type="button" className="btn btn-secondary" onClick={fetchReportData} disabled={reportLoading}>
+            {reportLoading ? "Loading…" : "Refresh"}
+          </button>
+        </div>
+
+        {reportLoading ? (
+          <StateNotice>Loading report data…</StateNotice>
+        ) : (
+          <>
+            <div className="report-stat-grid">
+              <div className="report-stat">
+                <span className="report-stat__value">{reportStats.totalItems}</span>
+                <span className="report-stat__label">Total Inventory Items</span>
+              </div>
+              <div className="report-stat report-stat--danger">
+                <span className="report-stat__value">{reportStats.lowStock}</span>
+                <span className="report-stat__label">Low Stock Items</span>
+              </div>
+              <div className="report-stat report-stat--warning">
+                <span className="report-stat__value">{reportStats.mediumStock}</span>
+                <span className="report-stat__label">Medium Stock Items</span>
+              </div>
+              <div className="report-stat report-stat--info">
+                <span className="report-stat__value">{reportStats.pendingCount}</span>
+                <span className="report-stat__label">Pending Requisitions</span>
+              </div>
+              <div className="report-stat report-stat--success">
+                <span className="report-stat__value">{reportStats.fulfilledCount}</span>
+                <span className="report-stat__label">Fulfilled Requisitions</span>
+              </div>
+              <div className="report-stat">
+                <span className="report-stat__value">{reportStats.totalUsers}</span>
+                <span className="report-stat__label">Total Users</span>
+              </div>
+            </div>
+
+            {Object.keys(reportStats.byRole).length > 0 && (
+              <div className="report-role-breakdown">
+                <h4 className="report-role-breakdown__title">Users by Role</h4>
+                <ul className="report-role-list" role="list">
+                  {Object.entries(reportStats.byRole)
+                    .sort(([, a], [, b]) => b - a)
+                    .map(([roleName, count]) => (
+                      <li key={roleName} className="report-role-item">
+                        <span className="report-role-item__name">{roleName}</span>
+                        <span className="report-role-item__count">{count}</span>
+                      </li>
+                    ))}
+                </ul>
+              </div>
+            )}
+          </>
         )}
       </section>
 

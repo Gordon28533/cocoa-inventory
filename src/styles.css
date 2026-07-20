@@ -1110,6 +1110,79 @@ tr:hover {
   color: var(--color-text-muted);
 }
 
+/* ── Admin Reports ─────────────────────────────────────────────────────────── */
+.report-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.report-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 16px;
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  border-top: 3px solid var(--color-border-strong);
+  text-align: center;
+}
+
+.report-stat--danger  { border-top-color: var(--color-danger); }
+.report-stat--warning { border-top-color: #b7791f; }
+.report-stat--success { border-top-color: #28a745; }
+.report-stat--info    { border-top-color: var(--color-primary, #0066cc); }
+
+.report-stat__value {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--color-text);
+  line-height: 1;
+}
+
+.report-stat__label {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+  font-weight: 500;
+}
+
+.report-role-breakdown {
+  margin-top: 4px;
+}
+
+.report-role-breakdown__title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-text);
+  margin: 0 0 10px;
+}
+
+.report-role-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.report-role-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.report-role-item__name  { font-size: 0.8rem; color: var(--color-text-muted); font-weight: 500; }
+.report-role-item__count { font-size: 0.875rem; font-weight: 700; color: var(--color-text); }
+
 .filter-toolbar {
   display: flex;
   gap: 16px;
