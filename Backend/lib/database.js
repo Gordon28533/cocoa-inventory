@@ -266,13 +266,24 @@ export function createDatabaseManager({ env = process.env, logger = console } = 
       // Credentials and password hash are read from config.js (env-driven).
       // Override ADMIN_STAFF_NAME, ADMIN_STAFF_ID, and ADMIN_PASSWORD_HASH in
       // environment variables to avoid deploying with the default password.
-      await db.execute(`
-        INSERT INTO users ("staffName", "staffId", password, role, department_id, "isActive")
-        SELECT $1, $2, $3, 'admin',
-               (SELECT id FROM departments WHERE name = 'Head Office' LIMIT 1),
-               1
-        WHERE NOT EXISTS (SELECT 1 FROM users WHERE "staffName" = $1)
-      `, [ADMIN_STAFF_NAME, ADMIN_STAFF_ID, ADMIN_PASSWORD_HASH]);
+      //
+      // IMPORTANT: this must use VALUES, not `SELECT $1, $2, $3 … WHERE NOT
+      // EXISTS (…)`. PostgreSQL gives a bare SELECT list of bind parameters no
+      // type context, so that form fails at parse time with
+      //   "could not determine data type of parameter $1"
+      // which aborted the whole seed block and left the deployment with no
+      // admin account at all. With VALUES, PostgreSQL infers each parameter's
+      // type from the target column. `ON CONFLICT DO NOTHING` without a
+      // conflict target makes the statement safe against any unique violation
+      // ("staffName" or "staffId") when it re-runs on every boot.
+      await db.execute(
+        `INSERT INTO users ("staffName", "staffId", password, role, department_id, "isActive")
+         VALUES ($1, $2, $3, 'admin',
+                 (SELECT id FROM departments WHERE name = 'Head Office' LIMIT 1),
+                 1)
+         ON CONFLICT DO NOTHING`,
+        [ADMIN_STAFF_NAME, ADMIN_STAFF_ID, ADMIN_PASSWORD_HASH]
+      );
 
       // Patch the admin account: if the row pre-dates the staffId column, it will
       // have an empty staffId. Ensure it is always set to the canonical value.
@@ -282,9 +293,43 @@ export function createDatabaseManager({ env = process.env, logger = console } = 
         [ADMIN_STAFF_ID, ADMIN_STAFF_NAME]
       );
 
-      logger.log("Schema check complete");
+      // Verify the bootstrap actually landed. A silent failure here is the
+      // difference between a working deployment and one nobody can log into,
+      // so it is worth an explicit check rather than assuming the INSERT ran.
+      const [adminRows] = await db.execute(
+        `SELECT id, "staffId", role, "isActive" FROM users WHERE "staffId" = $1`,
+        [ADMIN_STAFF_ID]
+      );
+
+      if (adminRows.length === 0) {
+        logger.error(
+          `ADMIN BOOTSTRAP FAILED — no user row with staffId="${ADMIN_STAFF_ID}". ` +
+          `Every login attempt will be rejected until this is resolved.`
+        );
+      } else {
+        logger.log(
+          `Admin account present — staffId="${adminRows[0].staffId}", ` +
+          `role="${adminRows[0].role}", isActive=${adminRows[0].isActive}`
+        );
+      }
+
+      const [countRows] = await db.execute(
+        "SELECT COUNT(*)::int AS count FROM users",
+        []
+      );
+      logger.log(
+        `Schema check complete — ${countRows[0].count} user account(s) in database`
+      );
     } catch (error) {
-      logger.error("Schema check/update failed:", error);
+      // Surface the full PostgreSQL error detail. Logging the bare error object
+      // hid the root cause of the admin-bootstrap failure for an entire
+      // deployment cycle, so each diagnostic field is printed explicitly.
+      logger.error("Schema check/update FAILED:", error.message);
+      if (error.code)     logger.error("  pg code:  ", error.code);
+      if (error.detail)   logger.error("  detail:   ", error.detail);
+      if (error.hint)     logger.error("  hint:     ", error.hint);
+      if (error.position) logger.error("  position: ", error.position);
+      logger.error(error.stack);
     }
   }
 
