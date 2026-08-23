@@ -14,7 +14,7 @@ const StateNotice = ({ children, tone = "neutral" }) => (
 
 StateNotice.propTypes = {
   children: PropTypes.node.isRequired,
-  tone: PropTypes.oneOf(["neutral", "error", "success"])
+  tone: PropTypes.oneOf(["neutral", "error", "success", "warning"])
 };
 
 export default StateNotice;

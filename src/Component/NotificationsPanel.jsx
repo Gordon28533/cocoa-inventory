@@ -18,7 +18,9 @@ const APPROVER_ROLES     = new Set(["account", "hod", "deputy_hod", "it_manager"
 const RECENT_DAYS = 7;
 
 // ── helpers ───────────────────────────────────────────────────────────────────
+// Mirrors StockAlert.jsx: zero quantity is "out", not merely "low".
 const getSeverityKey = (quantity) => {
+  if (quantity <= 0)                return "out";
   if (quantity <= LOW_THRESHOLD)    return "low";
   if (quantity <= MEDIUM_THRESHOLD) return "medium";
   return null;
@@ -62,9 +64,10 @@ const NotificationsPanel = ({ inventory }) => {
   // ── stock alerts ─────────────────────────────────────────────────────────
   const showStock = STOCK_ALERT_ROLES.has(userRole);
 
-  const { lowItems, mediumItems } = useMemo(() => {
+  const { outItems, lowItems, mediumItems } = useMemo(() => {
     const sorted = [...inventory].sort((a, b) => a.quantity - b.quantity);
     return {
+      outItems:    sorted.filter((i) => getSeverityKey(i.quantity) === "out"),
       lowItems:    sorted.filter((i) => getSeverityKey(i.quantity) === "low"),
       mediumItems: sorted.filter((i) => getSeverityKey(i.quantity) === "medium"),
     };
@@ -98,8 +101,10 @@ const NotificationsPanel = ({ inventory }) => {
       .slice(0, 10);
   }, [requisitions]);
 
+  const stockAlertCount = outItems.length + lowItems.length + mediumItems.length;
+
   const totalAlerts =
-    (showStock    ? lowItems.length + mediumItems.length : 0) +
+    (showStock    ? stockAlertCount : 0) +
     (showApprovals ? pendingBatches.length : 0);
 
   return (
@@ -132,20 +137,39 @@ const NotificationsPanel = ({ inventory }) => {
         <section className="notif-section" aria-labelledby="notif-stock-heading">
           <h3 className="notif-section__title" id="notif-stock-heading">
             Stock Alerts
-            {(lowItems.length + mediumItems.length) > 0 && (
+            {stockAlertCount > 0 && (
               <span
                 className="notif-badge notif-badge--danger"
-                aria-label={`${lowItems.length + mediumItems.length} stock alerts`}
+                aria-label={`${stockAlertCount} stock alerts`}
               >
-                {lowItems.length + mediumItems.length}
+                {stockAlertCount}
               </span>
             )}
           </h3>
 
-          {lowItems.length + mediumItems.length === 0 ? (
-            <StateNotice>All items are sufficiently stocked.</StateNotice>
+          {inventory.length === 0 ? (
+            // Not the same as "everything is fine" — there is simply nothing
+            // being tracked, so no conclusion about stock levels is possible.
+            <StateNotice tone="warning">
+              No inventory items are being tracked yet — nothing to report on.
+            </StateNotice>
+          ) : stockAlertCount === 0 ? (
+            <StateNotice>
+              All {inventory.length} tracked item{inventory.length !== 1 ? "s are" : " is"} sufficiently stocked.
+            </StateNotice>
           ) : (
             <ul className="notif-list" role="list">
+              {outItems.map((item) => (
+                <li key={item.id} className="notif-item notif-item--danger">
+                  <div className="notif-item__body">
+                    <span className="notif-item__title">{item.name}</span>
+                    <span className="notif-item__sub">
+                      None remaining
+                    </span>
+                  </div>
+                  <StatusBadge variant="danger" color="#a71d2a">Out of Stock</StatusBadge>
+                </li>
+              ))}
               {lowItems.map((item) => (
                 <li key={item.id} className="notif-item notif-item--danger">
                   <div className="notif-item__body">

@@ -7,6 +7,12 @@ const LOW_THRESHOLD    = 10;   // ≤ 10  → Low
 const MEDIUM_THRESHOLD = 30;   // ≤ 30  → Medium
 
 const SEVERITY = {
+  out: {
+    label:    "Out of Stock",
+    variant:  "danger",
+    color:    "#a71d2a",
+    priority: 0,
+  },
   low: {
     label:    "Low Stock",
     variant:  "danger",
@@ -21,7 +27,10 @@ const SEVERITY = {
   },
 };
 
+// A quantity of zero is not "low" — the item is unavailable, and saying
+// "Low Stock" for it understates the situation to whoever reads the alert.
 const getSeverity = (quantity) => {
+  if (quantity <= 0)                return "out";
   if (quantity <= LOW_THRESHOLD)    return "low";
   if (quantity <= MEDIUM_THRESHOLD) return "medium";
   return null;
@@ -45,7 +54,7 @@ const AlertRow = ({ item, severityKey }) => {
 
 AlertRow.propTypes = {
   item:        PropTypes.object.isRequired,
-  severityKey: PropTypes.oneOf(["low", "medium"]).isRequired,
+  severityKey: PropTypes.oneOf(["out", "low", "medium"]).isRequired,
 };
 
 // ── Group ─────────────────────────────────────────────────────────────────────
@@ -71,7 +80,7 @@ const AlertGroup = ({ severityKey, items }) => {
 };
 
 AlertGroup.propTypes = {
-  severityKey: PropTypes.oneOf(["low", "medium"]).isRequired,
+  severityKey: PropTypes.oneOf(["out", "low", "medium"]).isRequired,
   items:       PropTypes.array.isRequired,
 };
 
@@ -79,16 +88,34 @@ AlertGroup.propTypes = {
 const StockAlert = ({ inventory }) => {
   // Partition items into severity buckets, sorted by quantity ascending
   const sorted   = [...inventory].sort((a, b) => a.quantity - b.quantity);
+  const outItems = sorted.filter((i) => getSeverity(i.quantity) === "out");
   const lowItems = sorted.filter((i) => getSeverity(i.quantity) === "low");
   const medItems = sorted.filter((i) => getSeverity(i.quantity) === "medium");
 
-  const totalAlerts = lowItems.length + medItems.length;
+  const totalAlerts = outItems.length + lowItems.length + medItems.length;
+
+  // An empty inventory is NOT a clean bill of health. Reporting "all items are
+  // sufficiently stocked" when nothing is tracked tells the reader the opposite
+  // of the truth, so the two states get separate messages.
+  if (inventory.length === 0) {
+    return (
+      <div className="stock-alert stock-alert--untracked" role="status">
+        <span className="stock-alert__warn-icon" aria-hidden="true">!</span>
+        <p>
+          No inventory items are being tracked yet — so there is nothing to
+          report on. Add items before relying on these alerts.
+        </p>
+      </div>
+    );
+  }
 
   if (totalAlerts === 0) {
     return (
       <div className="stock-alert stock-alert--empty" role="status">
         <span className="stock-alert__ok-icon" aria-hidden="true">✓</span>
-        <p>All items are sufficiently stocked.</p>
+        <p>
+          All {inventory.length} tracked item{inventory.length !== 1 ? "s are" : " is"} sufficiently stocked.
+        </p>
       </div>
     );
   }
@@ -105,12 +132,18 @@ const StockAlert = ({ inventory }) => {
           </span>
         </h3>
         <p className="stock-alert__subtitle">
+          {outItems.length > 0 && `${outItems.length} item${outItems.length !== 1 ? "s" : ""} out of stock. `}
           {lowItems.length > 0 && `${lowItems.length} item${lowItems.length !== 1 ? "s" : ""} critically low. `}
           {medItems.length > 0 && `${medItems.length} item${medItems.length !== 1 ? "s" : ""} at medium stock.`}
         </p>
       </div>
 
-      {/* ── Low stock group (shown first — highest severity) ───────── */}
+      {/* ── Out of stock group (shown first — highest severity) ────── */}
+      {outItems.length > 0 && (
+        <AlertGroup severityKey="out" items={outItems} />
+      )}
+
+      {/* ── Low stock group ─────────────────────────────────────────── */}
       {lowItems.length > 0 && (
         <AlertGroup severityKey="low" items={lowItems} />
       )}

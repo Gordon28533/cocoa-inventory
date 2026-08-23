@@ -1500,6 +1500,56 @@ tr:hover {
   color: #19623b;
 }
 
+.state-notice--warning {
+  background: #fff8e1;
+  color: #7a5800;
+}
+
+/* ── Stock alert empty states ──────────────────────────────────────────────
+   Two visually distinct states, because "nothing is tracked" and "everything
+   is healthy" must never look alike. */
+.stock-alert--empty,
+.stock-alert--untracked {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.9rem 1rem;
+  border-radius: 8px;
+  font-size: 0.95rem;
+}
+
+.stock-alert--empty {
+  background: var(--color-success-bg);
+  color: #19623b;
+}
+
+.stock-alert--untracked {
+  background: #fff8e1;
+  color: #7a5800;
+  border: 1px solid #f0d38a;
+}
+
+.stock-alert__ok-icon,
+.stock-alert__warn-icon {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  font-weight: 700;
+  color: #fff;
+}
+
+.stock-alert__ok-icon   { background: #2f9e5f; }
+.stock-alert__warn-icon { background: #d69e2e; }
+
+.stock-alert--empty p,
+.stock-alert--untracked p {
+  margin: 0;
+}
+
 .field-readonly {
   background: var(--color-surface-muted) !important;
   color: var(--color-text-muted);
