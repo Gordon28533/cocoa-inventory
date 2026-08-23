@@ -172,7 +172,7 @@ const Dashboard = ({
   // Depend on the message string, not the whole notification object — the
   // object reference changes on every setNotification call even when the
   // message hasn't actually changed.
-  }, [notification.message]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [notification.message]);
 
   if (isLoading) {
     return (

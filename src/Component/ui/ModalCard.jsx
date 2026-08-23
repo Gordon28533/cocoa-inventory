@@ -32,7 +32,7 @@ const ModalCard = ({ title, children, minWidth = 320, maxWidth = 520, onClose, c
     return () => {
       returnFocusRef.current?.focus?.();
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   // Keyboard trap: Escape → close; Tab → cycle through focusable elements.
   // Depends on `onClose` so the handler always holds the current callback.

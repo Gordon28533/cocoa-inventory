@@ -136,7 +136,9 @@ const AdminAddUser = () => {
       fetchUsers();
       fetchReportData();
     }
-  }, [passwordPrompt]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Intentionally depends only on passwordPrompt: fetchUsers and fetchReportData
+  // are re-created every render, so including them would re-fetch in a loop.
+  }, [passwordPrompt]);
 
   const fetchUsers = async () => {
     setLoading(true);
