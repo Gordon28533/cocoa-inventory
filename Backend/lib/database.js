@@ -181,6 +181,7 @@ export function createDatabaseManager({ env = process.env, logger = console } = 
           id            VARCHAR(50)  PRIMARY KEY,
           name          VARCHAR(255) NOT NULL,
           category      VARCHAR(100),
+          type          VARCHAR(100),
           quantity      INTEGER      NOT NULL DEFAULT 0,
           unit          VARCHAR(50),
           reorder_level INTEGER      NOT NULL DEFAULT 0,
@@ -240,6 +241,12 @@ export function createDatabaseManager({ env = process.env, logger = console } = 
         "ALTER TABLE requisitions ADD COLUMN is_head_office SMALLINT NOT NULL DEFAULT 0");
       await runIfColumnMissing(db, "audit_logs",   "details",
         "ALTER TABLE audit_logs ADD COLUMN details TEXT NULL");
+      // inventoryRoutes both SELECTs and INSERTs an item "type", but the column
+      // was never in the original CREATE TABLE. Without it, GET /items and
+      // POST /items both fail with 'column "type" does not exist' — the latter
+      // surfacing to the user as "Failed to add item".
+      await runIfColumnMissing(db, "inventory",    "type",
+        "ALTER TABLE inventory ADD COLUMN type VARCHAR(100)");
       await runIfColumnMissing(db, "requisitions", "rejected_by",
         "ALTER TABLE requisitions ADD COLUMN rejected_by INTEGER NULL");
       // staffId was added to users after the initial deployment; add it as nullable
