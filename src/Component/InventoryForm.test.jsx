@@ -43,11 +43,13 @@ describe("InventoryForm", () => {
       id: "GEN-001",
       name: "AIR REFRESHNER",
       category: "General Stock",
-      type: "Cleaning",
+      type: "Cleaning & Hygiene",
       quantity: 7
     });
 
-    renderForm(<InventoryForm setInventory={setInventory} />);
+    // showPreview is opt-in — the preview panel is not rendered without it,
+    // so it must be passed for the assertion below to have anything to find.
+    renderForm(<InventoryForm setInventory={setInventory} showPreview />);
 
     expect(await screen.findByText(/Current Inventory Items/i)).toBeInTheDocument();
     expect(screen.getByText(/Choose a stock category first to unlock the matching item IDs./i)).toBeInTheDocument();
@@ -58,8 +60,10 @@ describe("InventoryForm", () => {
     fireEvent.change(screen.getByLabelText(/Item ID/i), {
       target: { value: "GEN-001" }
     });
+    // Type is a <select> populated from ITEM_TYPES, so the value must be one of
+    // the options defined for the selected category.
     fireEvent.change(screen.getByLabelText(/Type/i), {
-      target: { value: "Cleaning" }
+      target: { value: "Cleaning & Hygiene" }
     });
     fireEvent.change(screen.getByLabelText(/Quantity/i), {
       target: { value: "7" }
@@ -71,7 +75,7 @@ describe("InventoryForm", () => {
         id: "GEN-001",
         name: "AIR REFRESHNER",
         category: "General Stock",
-        type: "Cleaning",
+        type: "Cleaning & Hygiene",
         quantity: 7
       });
     });
@@ -96,7 +100,7 @@ describe("InventoryForm", () => {
           id: "STA-007",
           name: "PEN BLUE",
           category: "Stationery Stock",
-          type: "Pen",
+          type: "Record Book",
           quantity: 12
         }}
         onSubmit={onSubmit}
@@ -108,7 +112,7 @@ describe("InventoryForm", () => {
     expect(screen.getByDisplayValue("STA-007")).toBeDisabled();
 
     fireEvent.change(screen.getByLabelText(/Type/i), {
-      target: { value: "Blue Pen" }
+      target: { value: "Writing Instrument" }
     });
     fireEvent.change(screen.getByLabelText(/Quantity/i), {
       target: { value: "20" }
@@ -120,7 +124,7 @@ describe("InventoryForm", () => {
         id: "STA-007",
         name: "PEN BLUE",
         category: "Stationery Stock",
-        type: "Blue Pen",
+        type: "Writing Instrument",
         quantity: 20
       });
     });

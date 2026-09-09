@@ -13,8 +13,10 @@ describe("/login endpoint", () => {
   it("rejects invalid credentials", async () => {
     const db = createMockDb({
       async execute(sql, params) {
-        if (sql.includes("FROM users WHERE staffName = ?")) {
-          assert.equal(params[0], "wronguser");
+        // Authentication is by staffId (the employee number on the ID card),
+        // and PostgreSQL requires the camel-case identifier to be quoted.
+        if (sql.includes('FROM users WHERE "staffId" = ?')) {
+          assert.equal(params[0], "WRONG001");
           return [[]];
         }
 
@@ -30,7 +32,7 @@ describe("/login endpoint", () => {
         const { response, data } = await fetchJson(baseUrl, "/login", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ staffName: "wronguser", password: "wrongpass" })
+          body: JSON.stringify({ staffId: "WRONG001", password: "wrongpass" })
         });
 
         assert.equal(response.status, 401);
@@ -44,8 +46,11 @@ describe("/login endpoint", () => {
     const passwordHash = await bcrypt.hash("correctpass", 10);
     const db = createMockDb({
       async execute(sql) {
-        if (sql.includes("FROM users WHERE staffName = ?")) {
-          return [[{ id: 7, staffName: "admin", password: passwordHash, role: "admin", department_id: 2, isActive: 1 }]];
+        if (sql.includes('FROM users WHERE "staffId" = ?')) {
+          return [[{
+            id: 7, staffName: "admin", staffId: "ADMIN001", password: passwordHash,
+            role: "admin", department_id: 2, isActive: 1
+          }]];
         }
 
         throw new Error(`Unexpected SQL: ${sql}`);
@@ -60,7 +65,7 @@ describe("/login endpoint", () => {
         const { response, data } = await fetchJson(baseUrl, "/login", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ staffName: "admin", password: "correctpass" })
+          body: JSON.stringify({ staffId: "ADMIN001", password: "correctpass" })
         });
 
         assert.equal(response.status, 200);
@@ -79,14 +84,13 @@ describe("auth profile routes", () => {
     const token = createTestToken({ id: 14, role: "account_manager", department_id: 3 });
     const db = createMockDb({
       async execute(sql, params) {
-        if (sql.includes("SELECT isActive, role, department_id FROM users WHERE id = ?")) {
+        // The live-user lookup is handled centrally by createMockDb.
+        if (sql.includes('SELECT id, "staffName", "staffId", role, department_id FROM users WHERE id = ?')) {
           assert.equal(params[0], 14);
-          return [[{ isActive: 1 }]];
-        }
-
-        if (sql.includes("SELECT id, staffName, role, department_id FROM users WHERE id = ?")) {
-          assert.equal(params[0], 14);
-          return [[{ id: 14, staffName: "Grace", role: "account_manager", department_id: 3 }]];
+          return [[{
+            id: 14, staffName: "Grace", staffId: "ACC014",
+            role: "account_manager", department_id: 3
+          }]];
         }
 
         throw new Error(`Unexpected SQL: ${sql}`);
@@ -108,6 +112,7 @@ describe("auth profile routes", () => {
         assert.deepEqual(data, {
           id: 14,
           staffName: "Grace",
+          staffId: "ACC014",
           role: "account_manager",
           department_id: 3
         });
