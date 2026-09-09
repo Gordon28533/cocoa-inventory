@@ -22,7 +22,7 @@ export function createDepartmentRouter({ getDb, requireAuth, requireAdmin, requi
       res.json(rows);
     } catch (error) {
       logUnexpectedError(console, "Error fetching departments", error);
-      return serverError(res, "Failed to fetch departments");
+      return serverError(res, "Failed to fetch departments", error);
     }
   });
 
@@ -59,7 +59,7 @@ export function createDepartmentRouter({ getDb, requireAuth, requireAdmin, requi
       if (isDuplicateEntryError(error)) {
         return badRequest(res, "Department name already exists");
       }
-      return serverError(res, "Failed to create department");
+      return serverError(res, "Failed to create department", error);
     }
   });
 
@@ -94,7 +94,7 @@ export function createDepartmentRouter({ getDb, requireAuth, requireAdmin, requi
       if (isDuplicateEntryError(error)) {
         return badRequest(res, "Department name already exists");
       }
-      return serverError(res, "Failed to update department");
+      return serverError(res, "Failed to update department", error);
     }
   });
 
@@ -120,7 +120,7 @@ export function createDepartmentRouter({ getDb, requireAuth, requireAdmin, requi
       res.json({ success: true, message: "Department deleted successfully" });
     } catch (error) {
       logUnexpectedError(console, "Error deleting department", error);
-      return serverError(res, "Failed to delete department");
+      return serverError(res, "Failed to delete department", error);
     }
   });
 

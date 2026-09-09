@@ -31,7 +31,7 @@ export function createUserRouter({ getDb, requireAdmin, requireDatabase, logAudi
       res.json(rows);
     } catch (error) {
       logUnexpectedError(console, "Error fetching users", error);
-      return serverError(res, "Failed to fetch users");
+      return serverError(res, "Failed to fetch users", error);
     }
   });
 
@@ -118,7 +118,7 @@ export function createUserRouter({ getDb, requireAdmin, requireDatabase, logAudi
       if (isDuplicateEntryError(error)) {
         return badRequest(res, "A user with that staff name or staff ID already exists");
       }
-      return serverError(res, "Failed to update user");
+      return serverError(res, "Failed to update user", error);
     }
   });
 
@@ -140,7 +140,7 @@ export function createUserRouter({ getDb, requireAdmin, requireDatabase, logAudi
       res.json({ success: true, message: "User deleted successfully" });
     } catch (error) {
       logUnexpectedError(console, "Error deleting user", error);
-      return serverError(res, "Failed to delete user");
+      return serverError(res, "Failed to delete user", error);
     }
   });
 
@@ -162,7 +162,7 @@ export function createUserRouter({ getDb, requireAdmin, requireDatabase, logAudi
       res.json({ success: true, message: "User deactivated successfully" });
     } catch (error) {
       logUnexpectedError(console, "Error deactivating user", error);
-      return serverError(res, "Failed to deactivate user");
+      return serverError(res, "Failed to deactivate user", error);
     }
   });
 
@@ -185,7 +185,7 @@ export function createUserRouter({ getDb, requireAdmin, requireDatabase, logAudi
       res.json({ success: true, message: "User activated successfully" });
     } catch (error) {
       logUnexpectedError(console, "Error activating user", error);
-      return serverError(res, "Failed to activate user");
+      return serverError(res, "Failed to activate user", error);
     }
   });
 
@@ -267,7 +267,7 @@ export function createUserRouter({ getDb, requireAdmin, requireDatabase, logAudi
       if (isDuplicateEntryError(error)) {
         return badRequest(res, "A user with that staff name or staff ID already exists");
       }
-      return serverError(res, "Internal server error");
+      return serverError(res, "Internal server error", error);
     }
   });
 
@@ -290,7 +290,7 @@ export function createUserRouter({ getDb, requireAdmin, requireDatabase, logAudi
       res.json(rows);
     } catch (error) {
       logUnexpectedError(console, "Error fetching audit logs", error);
-      return serverError(res, "Failed to fetch audit logs");
+      return serverError(res, "Failed to fetch audit logs", error);
     }
   });
 

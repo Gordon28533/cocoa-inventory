@@ -99,6 +99,14 @@ export function createRequisitionRouter({ getDb, requireAuth, requireDatabase, l
         return forbidden(res, "You can only submit requisitions for your assigned department");
       }
 
+      // is_it_item is a SMALLINT column, so it must be sent as 1/0 rather than a
+      // JavaScript boolean. node-postgres serialises `true` as the text 't', and
+      // PostgreSQL rejects that for a smallint with
+      //   invalid input syntax for type smallint: "t"
+      // MySQL coerced booleans silently, which is why this survived the migration.
+      // isHeadOffice below is already normalised to 1/0 where it is computed.
+      const isItItem = is_it_item ? 1 : 0;
+
       for (const item of items) {
         await db.execute(
           `INSERT INTO requisitions
@@ -107,7 +115,7 @@ export function createRequisitionRouter({ getDb, requireAuth, requireDatabase, l
            VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?)`,
           [
             item.id, requestedBy, finalDepartment, finalDepartmentId,
-            item.quantity, uniqueCode, !!is_it_item, isHeadOffice, batchId
+            item.quantity, uniqueCode, isItItem, isHeadOffice, batchId
           ]
         );
       }
@@ -116,7 +124,7 @@ export function createRequisitionRouter({ getDb, requireAuth, requireDatabase, l
       res.status(201).json({ success: true, batch_id: batchId, unique_code: uniqueCode });
     } catch (error) {
       logUnexpectedError(console, "Error creating requisition", error);
-      return serverError(res, "Failed to create requisition");
+      return serverError(res, "Failed to create requisition", error);
     }
   });
 
@@ -148,7 +156,7 @@ export function createRequisitionRouter({ getDb, requireAuth, requireDatabase, l
       res.json(rows);
     } catch (error) {
       logUnexpectedError(console, "Error fetching requisitions", error);
-      return serverError(res, "Failed to fetch requisitions");
+      return serverError(res, "Failed to fetch requisitions", error);
     }
   });
 
@@ -222,7 +230,7 @@ export function createRequisitionRouter({ getDb, requireAuth, requireDatabase, l
       res.json({ success: true, status: nextStatus });
     } catch (error) {
       logUnexpectedError(console, "Error approving requisition", error);
-      return serverError(res, "Failed to approve requisition");
+      return serverError(res, "Failed to approve requisition", error);
     }
   });
 
@@ -289,7 +297,7 @@ export function createRequisitionRouter({ getDb, requireAuth, requireDatabase, l
       res.json({ success: true, status: "rejected" });
     } catch (error) {
       logUnexpectedError(console, "Error rejecting requisition", error);
-      return serverError(res, "Failed to reject requisition");
+      return serverError(res, "Failed to reject requisition", error);
     }
   });
 
@@ -349,7 +357,7 @@ export function createRequisitionRouter({ getDb, requireAuth, requireDatabase, l
         return badRequest(res, inventoryError);
       }
       logUnexpectedError(console, "Error fulfilling requisition", error);
-      return serverError(res, "Failed to fulfill requisition");
+      return serverError(res, "Failed to fulfill requisition", error);
     }
   });
 
@@ -405,7 +413,7 @@ export function createRequisitionRouter({ getDb, requireAuth, requireDatabase, l
         return badRequest(res, inventoryError);
       }
       logUnexpectedError(console, "Error fulfilling batch", error);
-      return serverError(res, "Failed to fulfill batch");
+      return serverError(res, "Failed to fulfill batch", error);
     }
   });
 
@@ -429,7 +437,7 @@ export function createRequisitionRouter({ getDb, requireAuth, requireDatabase, l
       res.json(requisition);
     } catch (error) {
       logUnexpectedError(console, "Error fetching requisition by code", error);
-      return serverError(res, "Failed to fetch requisition");
+      return serverError(res, "Failed to fetch requisition", error);
     }
   });
 

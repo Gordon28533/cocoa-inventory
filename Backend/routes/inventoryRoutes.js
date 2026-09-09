@@ -27,7 +27,7 @@ export function createInventoryRouter({ getDb, requireAuth, requireDatabase, log
       res.json(rows);
     } catch (error) {
       logUnexpectedError(console, "Error fetching inventory", error);
-      return serverError(res, "Failed to fetch inventory");
+      return serverError(res, "Failed to fetch inventory", error);
     }
   });
 
@@ -81,7 +81,7 @@ export function createInventoryRouter({ getDb, requireAuth, requireDatabase, log
       });
     } catch (error) {
       logUnexpectedError(console, "Error adding item", error);
-      return serverError(res, "Failed to add item");
+      return serverError(res, "Failed to add item", error);
     }
   });
 
@@ -111,7 +111,7 @@ export function createInventoryRouter({ getDb, requireAuth, requireDatabase, log
       res.json({ success: true, message: "Item updated successfully" });
     } catch (error) {
       logUnexpectedError(console, "Error updating item", error);
-      return serverError(res, "Failed to update item");
+      return serverError(res, "Failed to update item", error);
     }
   });
 
@@ -140,7 +140,7 @@ export function createInventoryRouter({ getDb, requireAuth, requireDatabase, log
       }
 
       logUnexpectedError(console, "Error deleting item", error);
-      return serverError(res, "Failed to delete item");
+      return serverError(res, "Failed to delete item", error);
     }
   });
 

@@ -49,7 +49,7 @@ export function createAuthRouter({
       return res.json({ success: true, token });
     } catch (error) {
       logUnexpectedError(console, "Token refresh error", error);
-      return serverError(res, "Token refresh failed");
+      return serverError(res, "Token refresh failed", error);
     }
   });
 
@@ -111,7 +111,7 @@ export function createAuthRouter({
       res.status(401).json({ success: false, message: "Invalid credentials" });
     } catch (error) {
       logUnexpectedError(console, "Login error", error);
-      return serverError(res, "Login failed");
+      return serverError(res, "Login failed", error);
     }
   });
 
@@ -161,7 +161,7 @@ export function createAuthRouter({
       res.json({ success: true, message: "Password changed successfully." });
     } catch (error) {
       logUnexpectedError(console, "Change password error", error);
-      return serverError(res, "Failed to change password.");
+      return serverError(res, "Failed to change password.", error);
     }
   });
 
@@ -179,7 +179,7 @@ export function createAuthRouter({
       res.json(rows[0]);
     } catch (error) {
       logUnexpectedError(console, "Fetch user info error", error);
-      return serverError(res, "Failed to fetch user info");
+      return serverError(res, "Failed to fetch user info", error);
     }
   });
 
