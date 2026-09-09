@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import StateNotice from "./ui/StateNotice.jsx";
+import { useAuth } from "../Context/AuthContext.js";
 import { api } from "../utils/api.js";
 import { PAGE_SIZE_OPTIONS } from "../config/constants.js";
 
@@ -67,6 +68,7 @@ const RefreshIcon = ({ spinning }) => (
 
 // ─── component ───────────────────────────────────────────────────────────────
 const AuditLogViewer = () => {
+  const { token } = useAuth();
   const [logs, setLogs]           = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError]         = useState("");
@@ -83,6 +85,16 @@ const AuditLogViewer = () => {
 
   // ── fetch ─────────────────────────────────────────────────────────────
   const loadLogs = useCallback(async () => {
+    // Without a session there is nothing to authorise the request with, so the
+    // call would only ever come back 401. This guard was lost in a rewrite of
+    // this component; the audit-log endpoint requires admin authentication.
+    if (!token) {
+      setLogs([]);
+      setError("");
+      setIsLoading(false);
+      return;
+    }
+
     setIsLoading(true);
     setError("");
     try {
@@ -95,7 +107,7 @@ const AuditLogViewer = () => {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [token]);
 
   useEffect(() => { loadLogs(); }, [loadLogs]);
 

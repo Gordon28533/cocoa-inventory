@@ -89,9 +89,14 @@ describe("AdminAddUser", () => {
   beforeEach(() => {
     jest.clearAllMocks();
 
+    // staffId is required: re-authentication uses the employee number, and the
+    // Confirm button stays disabled while neither the session nor the Staff ID
+    // field supplies one. Omitting it left the button disabled, so the screen
+    // never unlocked and every assertion past that point failed.
     useAuth.mockReturnValue({
       role: "admin",
-      user: "Grace Admin"
+      user: "Grace Admin",
+      staffId: "ADMIN001"
     });
 
     useDepartments.mockReturnValue({
@@ -108,7 +113,7 @@ describe("AdminAddUser", () => {
     await unlockAdmin();
 
     expect(api.login).toHaveBeenCalledWith({
-      staffName: "Grace Admin",
+      staffId: "ADMIN001",
       password: "secret123"
     });
     expect(screen.getByText(/Grace Admin/i)).toBeInTheDocument();
@@ -149,7 +154,7 @@ describe("AdminAddUser", () => {
     fireEvent.change(selects[0], { target: { value: "stores" } });
     fireEvent.change(selects[1], { target: { value: "3" } });
 
-    fireEvent.change(screen.getByPlaceholderText(/Password \(leave blank for default\)/i), {
+    fireEvent.change(screen.getByPlaceholderText(/leave blank to auto-generate/i), {
       target: { value: "temp-pass" }
     });
     fireEvent.click(screen.getByRole("button", { name: /Add User/i }));

@@ -1,5 +1,5 @@
 import React from "react";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import { AuthContext } from "../Context/AuthContext.js";
 import AuditLogViewer from "./AuditLogViewer.jsx";
 import { api } from "../utils/api.js";
@@ -47,7 +47,10 @@ describe("AuditLogViewer", () => {
     renderViewer();
 
     expect(await screen.findByText(/Admin User/i)).toBeInTheDocument();
-    expect(screen.getByText(/Approved requisition/i)).toBeInTheDocument();
+    // The action also appears as an <option> in the action filter dropdown, so
+    // scope the assertion to the results table rather than the whole document.
+    const table = screen.getByRole("table");
+    expect(within(table).getByText(/Approved requisition/i)).toBeInTheDocument();
     expect(api.getAuditLogs).toHaveBeenCalledTimes(1);
   });
 
@@ -55,7 +58,7 @@ describe("AuditLogViewer", () => {
     renderViewer({ token: null });
 
     await waitFor(() => {
-      expect(screen.getByText(/No audit logs found./i)).toBeInTheDocument();
+      expect(screen.getByText(/No audit entries match your filters./i)).toBeInTheDocument();
     });
 
     expect(api.getAuditLogs).not.toHaveBeenCalled();

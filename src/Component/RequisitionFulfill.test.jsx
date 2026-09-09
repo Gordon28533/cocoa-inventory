@@ -64,8 +64,10 @@ describe("RequisitionFulfill", () => {
   it("separates ready batches from requested batches", async () => {
     renderFulfill(undefined);
 
-    expect(await screen.findByText(/READY-1/i)).toBeInTheDocument();
-    expect(screen.getByText(/WAIT-1/i)).toBeInTheDocument();
+    // Batch references are displayed truncated ("...EADY-1"), with the full
+    // batch id carried on the title attribute.
+    expect(await screen.findByTitle("READY-1")).toBeInTheDocument();
+    expect(screen.getByTitle("WAIT-1")).toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: /Open/i })).toHaveLength(2);
   });
 

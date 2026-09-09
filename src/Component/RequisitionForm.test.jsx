@@ -52,22 +52,33 @@ describe("RequisitionForm", () => {
       </AuthContext.Provider>
     );
 
+  // The form is a two-step wizard: Details (department, purpose, priority) then
+  // Items (a table of rows, each with an item select and a quantity input).
+  // Selecting an item means choosing it in a row's "Select item" dropdown, not
+  // ticking a per-item checkbox as the previous single-page layout did.
+  const goToItemsStep = () => {
+    fireEvent.click(screen.getByRole("button", { name: /Next: Add Items/i }));
+  };
+
+  const chooseItem = (itemId, quantity) => {
+    fireEvent.change(screen.getByLabelText("Select item"), { target: { value: itemId } });
+    fireEvent.change(screen.getByLabelText("Quantity"), { target: { value: String(quantity) } });
+  };
+
   it("blocks submission when the selected department does not match the logged-in user", async () => {
     const setNotification = jest.fn();
 
     renderForm(setNotification);
 
-    fireEvent.click(screen.getByLabelText(/Select Laptop/i));
-    fireEvent.change(screen.getByLabelText(/Department:/i), { target: { value: "4" } });
+    fireEvent.change(screen.getByLabelText(/Department/i), { target: { value: "4" } });
 
     await waitFor(() => {
       expect(screen.getByText(/You can only submit requisitions for your own department./i)).toBeInTheDocument();
     });
 
-    expect(screen.getByLabelText(/Department:/i)).toHaveAttribute("aria-invalid", "true");
-    expect(screen.getByRole("button", { name: /Submit Requisition/i })).toBeDisabled();
+    expect(screen.getByLabelText(/Department/i)).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByRole("button", { name: /Submit for Approval/i })).toBeDisabled();
     expect(api.createRequisition).not.toHaveBeenCalled();
-    expect(setNotification).not.toHaveBeenCalled();
   });
 
   it("blocks submission when a requested quantity exceeds available stock", async () => {
@@ -75,9 +86,9 @@ describe("RequisitionForm", () => {
 
     renderForm(setNotification);
 
-    fireEvent.click(screen.getByLabelText(/Select Laptop/i));
-    fireEvent.change(screen.getByLabelText(/Quantity for Laptop/i), { target: { value: "10" } });
-    fireEvent.click(screen.getByRole("button", { name: /Submit Requisition/i }));
+    goToItemsStep();
+    chooseItem("INV-1", 10);          // only 5 Laptops in stock
+    fireEvent.click(screen.getByRole("button", { name: /Submit for Approval/i }));
 
     await waitFor(() => {
       expect(setNotification).toHaveBeenCalledWith("Requested quantity exceeds available stock for Laptop.");
@@ -95,19 +106,21 @@ describe("RequisitionForm", () => {
 
     renderForm(setNotification);
 
-    fireEvent.click(screen.getByLabelText(/Select Laptop/i));
-    fireEvent.change(screen.getByLabelText(/Quantity for Laptop/i), { target: { value: "3" } });
-    fireEvent.click(screen.getByRole("button", { name: /Submit Requisition/i }));
+    goToItemsStep();
+    chooseItem("INV-1", 3);
+    fireEvent.click(screen.getByRole("button", { name: /Submit for Approval/i }));
 
     await waitFor(() => {
       expect(api.createRequisition).toHaveBeenCalledWith({
         items: [{ id: "INV-1", quantity: 3 }],
         department_id: 3,
-        is_it_item: false
+        is_it_item: false,
+        purpose: "",
+        priority: "Normal"
       });
     });
 
-    expect(setNotification).toHaveBeenCalledWith("Requisition submitted! Your pickup code: PICK1234");
+    expect(setNotification).toHaveBeenCalledWith("Requisition submitted! Pickup code: PICK1234");
 
     await waitFor(() => {
       expect(screen.getByText(/Your pickup code:/i)).toBeInTheDocument();

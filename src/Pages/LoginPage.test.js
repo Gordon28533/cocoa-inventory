@@ -18,18 +18,22 @@ describe("LoginPage", () => {
     renderLoginPage();
 
     expect(screen.getByText(/Welcome Back/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/Staff Name/i)).toBeInTheDocument();
-    expect(screen.getByPlaceholderText(/Enter your password/i)).toBeInTheDocument();
+    // Authentication is by employee number, so the field is "Employee ID".
+    expect(screen.getByLabelText(/Employee ID/i)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("Password")).toBeInTheDocument();
     expect(screen.queryByText(/Go directly to User Management/i)).not.toBeInTheDocument();
     expect(document.title).toBe("Sign In | Enterprise Inventory System");
-    expect(screen.getByLabelText(/Staff Name/i)).toHaveAttribute("aria-describedby", expect.stringContaining("login-subtitle"));
-    expect(screen.getByPlaceholderText(/Enter your password/i)).toHaveAttribute("aria-describedby", expect.stringContaining("login-help"));
+
+    // The shared description is now carried on the <form> rather than repeated
+    // on each input, so one announcement covers the whole form.
+    expect(screen.getByRole("form", { name: /Login form/i }))
+      .toHaveAttribute("aria-describedby", expect.stringContaining("login-subtitle"));
   });
 
   it("toggles password visibility", () => {
     renderLoginPage();
 
-    const passwordInput = screen.getByPlaceholderText(/Enter your password/i);
+    const passwordInput = screen.getByPlaceholderText("Password");
     const toggleButton = screen.getByRole("button", { name: /Show password/i });
 
     expect(passwordInput).toHaveAttribute("type", "password");

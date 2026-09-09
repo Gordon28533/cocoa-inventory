@@ -59,7 +59,7 @@ describe("MyRequisitions", () => {
   it("renders grouped batches from the current user's requisitions", async () => {
     render(<MyRequisitions inventory={inventory} />);
 
-    expect(await screen.findByText(/Batch ID: B-200/i)).toBeInTheDocument();
+    expect(await screen.findByTitle('B-200')).toBeInTheDocument();
     expect(screen.getByText(/Department: Accounts/i)).toBeInTheDocument();
     expect(screen.getByText(/Unique Code: CODE200/i)).toBeInTheDocument();
     expect(screen.getByText("Chair")).toBeInTheDocument();
@@ -69,15 +69,15 @@ describe("MyRequisitions", () => {
   it("filters batches by search text and status", async () => {
     render(<MyRequisitions inventory={inventory} />);
 
-    expect(await screen.findByText(/Batch ID: B-200/i)).toBeInTheDocument();
+    expect(await screen.findByTitle('B-200')).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText(/Search my requisitions/i), {
       target: { value: "chair" }
     });
 
     await waitFor(() => {
-      expect(screen.getByText(/Batch ID: B-200/i)).toBeInTheDocument();
-      expect(screen.queryByText(/Batch ID: B-100/i)).not.toBeInTheDocument();
+      expect(screen.getByTitle('B-200')).toBeInTheDocument();
+      expect(screen.queryByTitle('B-100')).not.toBeInTheDocument();
     });
 
     fireEvent.change(screen.getByLabelText(/Search my requisitions/i), {
@@ -88,8 +88,8 @@ describe("MyRequisitions", () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText(/Batch ID: B-100/i)).toBeInTheDocument();
-      expect(screen.queryByText(/Batch ID: B-200/i)).not.toBeInTheDocument();
+      expect(screen.getByTitle('B-100')).toBeInTheDocument();
+      expect(screen.queryByTitle('B-200')).not.toBeInTheDocument();
     });
   });
 

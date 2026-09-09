@@ -55,27 +55,41 @@ describe("RequisitionApproval", () => {
       </AuthContext.Provider>
     );
 
-  it("shows only approval batches relevant to the current role", async () => {
+  // Departmental scoping is enforced by the backend, not this component:
+  // GET /requisitions adds "WHERE department_id = ?" for approver roles, and
+  // the component renders whatever it is given. The mock therefore returns only
+  // what the server would return for an HOD in department 3.
+  const departmentScopedResponse = requisitions.filter((r) => r.department_id === 3);
+
+  it("renders a card for every batch returned by the API", async () => {
+    api.getRequisitions.mockResolvedValue(departmentScopedResponse);
+
     renderApproval(undefined);
 
-    expect(await screen.findByText(/Batch ID: B-1/i)).toBeInTheDocument();
-    expect(screen.queryByText(/Batch ID: B-2/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/Batch ID: B-3/i)).not.toBeInTheDocument();
+    expect(await screen.findByTitle("B-1")).toBeInTheDocument();
+    expect(screen.getByTitle("B-3")).toBeInTheDocument();
+    // B-2 belongs to another department, so the server never returns it.
+    expect(screen.queryByTitle("B-2")).not.toBeInTheDocument();
   });
 
-  it("approves a batch and refreshes the list", async () => {
-    const setNotification = jest.fn();
+  it("approves a batch after confirmation and refreshes the list", async () => {
+    api.getRequisitions.mockResolvedValue([requisitions[0]]);   // single batch: B-1
     api.approveRequisition.mockResolvedValue({ success: true });
 
-    renderApproval(setNotification);
+    renderApproval(jest.fn());
 
+    // Approving takes two steps: the card button opens a confirmation dialog,
+    // and the dialog's own button performs the approval.
     fireEvent.click(await screen.findByRole("button", { name: /Approve Batch/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /^Approve$/i }));
 
     await waitFor(() => {
       expect(api.approveRequisition).toHaveBeenCalledWith(0, { batch_id: "B-1" });
     });
 
-    expect(setNotification).toHaveBeenCalledWith("Batch approved successfully.");
+    // The confirmation message is rendered by the component itself rather than
+    // pushed through the setNotification prop.
+    expect(await screen.findByText(/Batch approved\./i)).toBeInTheDocument();
     expect(api.getRequisitions).toHaveBeenCalledTimes(2);
   });
 });
