@@ -167,7 +167,11 @@ export function createRequisitionRouter({ getDb, requireAuth, requireDatabase, l
     const user = req.user;
     const requisitionId = parsePositiveInteger(id);
 
-    if (!requisitionId) {
+    // A batch is identified by batch_id, not by any single requisition, so the
+    // client sends a placeholder in the :id segment when approving one. The id
+    // is therefore only required when no batch_id was supplied — validating it
+    // unconditionally rejected every batch approval before this point.
+    if (!batch_id && !requisitionId) {
       return badRequest(res, "Invalid requisition ID");
     }
 
@@ -242,7 +246,9 @@ export function createRequisitionRouter({ getDb, requireAuth, requireDatabase, l
     const user = req.user;
     const requisitionId = parsePositiveInteger(id);
 
-    if (!requisitionId) {
+    // As with approval: batch rejection identifies the target by batch_id and
+    // sends a placeholder :id, so only demand a valid id when no batch is named.
+    if (!batch_id && !requisitionId) {
       return badRequest(res, "Invalid requisition ID");
     }
 

@@ -181,6 +181,108 @@ describe("/requisitions routes", () => {
     );
   });
 
+  // The approval UI identifies a batch by batch_id and sends a placeholder in
+  // the :id segment — api.approveRequisition(0, { batch_id }). Every other test
+  // here uses a real numeric id, so this path, the only one the interface
+  // actually exercises, went uncovered while the route rejected it outright.
+  it("approves a batch when the id segment is a placeholder and batch_id is given", async () => {
+    const token = createTestToken({ id: 5, role: "hod", department_id: 9 });
+    const updates = [];
+
+    const db = createMockDb({
+      async execute(sql, params) {
+        if (sql.includes("FROM requisitions WHERE batch_id = ?")) {
+          assert.deepEqual(params, ["batch-ui"]);
+          return [[{ id: 31, status: "pending", department_id: 9, is_head_office: 1, is_it_item: 0 }]];
+        }
+
+        if (sql.startsWith("UPDATE requisitions SET")) {
+          updates.push(params);
+          return [[]];
+        }
+
+        if (sql.includes("INSERT INTO audit_logs")) {
+          return [[]];
+        }
+
+        throw new Error(`Unexpected SQL: ${sql}`);
+      }
+    });
+
+    await withTestApp(
+      { databaseManager: createMockDatabaseManager({ db }) },
+      async ({ baseUrl }) => {
+        const { response, data } = await fetchJson(baseUrl, "/requisitions/0/approve", {
+          method: "PUT",
+          headers: authHeaders(token),
+          body: JSON.stringify({ batch_id: "batch-ui" })
+        });
+
+        assert.equal(response.status, 200);
+        assert.equal(data.success, true);
+        assert.equal(data.status, "hod_approved");
+      }
+    );
+
+    assert.equal(updates.length, 1, "the batch status must actually be written");
+  });
+
+  it("rejects a batch when the id segment is a placeholder and batch_id is given", async () => {
+    const token = createTestToken({ id: 5, role: "hod", department_id: 9 });
+
+    const db = createMockDb({
+      async execute(sql, params) {
+        if (sql.includes("FROM requisitions WHERE batch_id = ?")) {
+          assert.deepEqual(params, ["batch-ui"]);
+          return [[{ id: 32, status: "pending", department_id: 9, is_head_office: 1, is_it_item: 0 }]];
+        }
+
+        if (sql.startsWith("UPDATE requisitions SET")) return [[]];
+        if (sql.includes("INSERT INTO audit_logs")) return [[]];
+
+        throw new Error(`Unexpected SQL: ${sql}`);
+      }
+    });
+
+    await withTestApp(
+      { databaseManager: createMockDatabaseManager({ db }) },
+      async ({ baseUrl }) => {
+        const { response, data } = await fetchJson(baseUrl, "/requisitions/0/reject", {
+          method: "PUT",
+          headers: authHeaders(token),
+          body: JSON.stringify({ batch_id: "batch-ui", reason: "Not required this quarter" })
+        });
+
+        assert.equal(response.status, 200);
+        assert.equal(data.status, "rejected");
+      }
+    );
+  });
+
+  // Guard the guard: with no batch_id, a bad id must still be refused.
+  it("still rejects an invalid requisition id when no batch_id is supplied", async () => {
+    const token = createTestToken({ id: 5, role: "hod", department_id: 9 });
+    const db = createMockDb({
+      async execute(sql) {
+        throw new Error(`Unexpected SQL: ${sql}`);
+      }
+    });
+
+    await withTestApp(
+      { databaseManager: createMockDatabaseManager({ db }) },
+      async ({ baseUrl }) => {
+        const { response, data } = await fetchJson(baseUrl, "/requisitions/0/approve", {
+          method: "PUT",
+          headers: authHeaders(token),
+          body: JSON.stringify({})
+        });
+
+        assert.equal(response.status, 400);
+        assert.match(data.error, /invalid requisition id/i);
+      }
+    );
+  });
+
   it("approves pending requisitions for a department hod", async () => {
     const token = createTestToken({ id: 5, role: "hod", department_id: 9 });
     const updates = [];
