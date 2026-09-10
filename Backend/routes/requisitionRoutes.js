@@ -226,7 +226,22 @@ export function createRequisitionRouter({ getDb, requireAuth, requireDatabase, l
         updateField = "account_approved_by";
         action      = "account_approve";
       } else {
-        return forbidden(res, "Not authorized to approve at this step");
+        // Name the mismatch. "Not authorized at this step" told the user
+        // nothing they could act on, and told a maintainer nothing either —
+        // whether the status was unexpected, the role was wrong, or the
+        // requisition simply belongs to a workflow this role has no part in.
+        const chain = first.is_head_office
+          ? (first.is_it_item
+              ? "Head Office IT: HOD or Deputy HOD, then IT Manager, then Accounts Manager"
+              : "Head Office: HOD or Deputy HOD, then Accounts Manager")
+          : "Branch: Accounts, then Accounts Manager";
+
+        return forbidden(
+          res,
+          `Your role (${user.role}) cannot approve this requisition at its ` +
+          `current status (${first.status}). Approval chain for this ` +
+          `requisition — ${chain}.`
+        );
       }
 
       await updateRequisitionBatch(db, requisitions, { status: nextStatus, [updateField]: user.id });
@@ -281,7 +296,11 @@ export function createRequisitionRouter({ getDb, requireAuth, requireDatabase, l
         ((first.status === "ho_account_approved" || first.status === "account_approved") && user.role === "stores");
 
       if (!canReject) {
-        return forbidden(res, "Not authorized to reject at this step");
+        return forbidden(
+          res,
+          `Your role (${user.role}) cannot reject this requisition at its ` +
+          `current status (${first.status}).`
+        );
       }
 
       if (DEPARTMENT_APPROVER_ROLES.has(user.role) && String(first.department_id) !== String(user.department_id)) {
