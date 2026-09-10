@@ -144,6 +144,26 @@ export function createDatabaseManager({ env = process.env, logger = console } = 
     }
   }
 
+  /**
+   * Add a named constraint only when it is not already present.
+   * Any existing rows that violate it are repaired first, since ALTER TABLE
+   * validates against current data and would otherwise fail on every boot.
+   */
+  async function runIfConstraintMissing(db, name, alterSql, repairSql = null) {
+    const [rows] = await db.execute(
+      "SELECT 1 FROM pg_constraint WHERE conname = $1",
+      [name]
+    );
+    if (rows.length) return;
+
+    if (repairSql) {
+      await db.execute(repairSql, []);
+    }
+
+    logger.log(`Adding constraint ${name}…`);
+    await db.execute(alterSql, []);
+  }
+
   async function ensureSchema() {
     if (!pool) return;
 
@@ -247,6 +267,17 @@ export function createDatabaseManager({ env = process.env, logger = console } = 
       // surfacing to the user as "Failed to add item".
       await runIfColumnMissing(db, "inventory",    "type",
         "ALTER TABLE inventory ADD COLUMN type VARCHAR(100)");
+
+      // Final backstop against over-issue. Row locking in
+      // deductInventoryForRequisitions already prevents concurrent fulfilments
+      // from both deducting the same stock, but a constraint makes a negative
+      // quantity unrepresentable no matter what any future code path does.
+      await runIfConstraintMissing(
+        db,
+        "inventory_quantity_non_negative",
+        "ALTER TABLE inventory ADD CONSTRAINT inventory_quantity_non_negative CHECK (quantity >= 0)",
+        "UPDATE inventory SET quantity = 0 WHERE quantity < 0"
+      );
       await runIfColumnMissing(db, "requisitions", "rejected_by",
         "ALTER TABLE requisitions ADD COLUMN rejected_by INTEGER NULL");
       // staffId was added to users after the initial deployment; add it as nullable

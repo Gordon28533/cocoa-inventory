@@ -448,12 +448,15 @@ describe("/requisitions routes", () => {
 
         if (sql.includes("SELECT id, quantity FROM inventory WHERE id = ?")) {
           assert.deepEqual(params, ["INV-1"]);
+          // The real query takes a row lock; assert it is still doing so.
+          assert.ok(sql.includes("FOR UPDATE"), "stock read must lock the row");
           return [[{ id: "INV-1", quantity: 12 }]];
         }
 
-        if (sql.includes("UPDATE inventory SET quantity = quantity - ? WHERE id = ?")) {
+        if (sql.includes("UPDATE inventory SET quantity = quantity - ?")) {
           inventoryUpdates.push({ sql, params });
-          return [{ affectedRows: 1 }];
+          // A matched row is returned via RETURNING id.
+          return [[{ id: "INV-1" }]];
         }
 
         if (sql.startsWith("UPDATE requisitions SET")) {
@@ -483,7 +486,8 @@ describe("/requisitions routes", () => {
         assert.equal(data.status, "fulfilled");
         assert.equal(data.batch_id, "batch-200");
         assert.equal(inventoryUpdates.length, 1);
-        assert.deepEqual(inventoryUpdates[0].params, [3, "INV-1"]);
+        // Third parameter is the quantity repeated in the "quantity >= ?" guard.
+        assert.deepEqual(inventoryUpdates[0].params, [3, "INV-1", 3]);
         assert.equal(updates.length, 1);
         assert.deepEqual(updates[0].params, ["fulfilled", 8, 1, 2]);
         assert.deepEqual(auditEntries, [[8, "fulfill", "batch-200", null]]);
@@ -529,6 +533,58 @@ describe("/requisitions routes", () => {
         assert.match(data.error, /insufficient stock for item inv-2/i);
       }
     );
+  });
+
+  it("rejects fulfillment when stock is taken by a competing transaction after the check", async () => {
+    // Simulates the race the row lock exists to prevent: the availability read
+    // still reports enough stock, but by the time the decrement runs another
+    // transaction has already taken it, so no row satisfies "quantity >= ?".
+    // The conditional UPDATE must catch this rather than deducting anyway.
+    const token = createTestToken({ id: 8, role: "stores" });
+    let rolledBack = false;
+
+    const db = createMockDb({
+      async execute(sql, params) {
+        if (sql.includes("FROM requisitions WHERE batch_id = ?")) {
+          return [[
+            { id: 9, item_id: "INV-3", quantity: 4, status: "account_approved", unique_code: "RACE1", department: "Branch" }
+          ]];
+        }
+
+        if (sql.includes("SELECT id, quantity FROM inventory WHERE id = ?")) {
+          assert.ok(sql.includes("FOR UPDATE"), "stock read must lock the row");
+          return [[{ id: "INV-3", quantity: 4 }]];   // looks sufficient
+        }
+
+        if (sql.includes("UPDATE inventory SET quantity = quantity - ?")) {
+          assert.ok(
+            sql.includes("quantity >= ?"),
+            "the decrement must re-assert availability in its WHERE clause"
+          );
+          return [[]];                                // no row matched — stock gone
+        }
+
+        throw new Error(`Unexpected SQL: ${sql}`);
+      }
+    });
+
+    db.rollback = async () => { rolledBack = true; };
+
+    await withTestApp(
+      { databaseManager: createMockDatabaseManager({ db }) },
+      async ({ baseUrl }) => {
+        const { response, data } = await fetchJson(baseUrl, "/requisitions/batch/batch-race/fulfill", {
+          method: "PUT",
+          headers: authHeaders(token),
+          body: JSON.stringify({ unique_code: "RACE1", receiver_id: "RCV-9" })
+        });
+
+        assert.equal(response.status, 400);
+        assert.match(data.error, /insufficient stock for item inv-3/i);
+      }
+    );
+
+    assert.equal(rolledBack, true, "the transaction must roll back, leaving stock untouched");
   });
 
   it("rejects single-item fulfillment when the unique code does not match", async () => {

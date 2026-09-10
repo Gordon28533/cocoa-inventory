@@ -70,8 +70,14 @@ export async function deductInventoryForRequisitions(db, requisitions) {
   }, new Map());
 
   for (const [itemId, quantityToDeduct] of groupedQuantities.entries()) {
+    // FOR UPDATE takes a row-level lock held until the enclosing transaction
+    // commits. Without it, the availability check below and the decrement that
+    // follows are two separate statements under READ COMMITTED, so two
+    // simultaneous fulfilments of the same item could both read sufficient
+    // stock and both deduct — issuing goods that are not there and driving the
+    // recorded quantity negative.
     const [[inventoryItem]] = await db.execute(
-      "SELECT id, quantity FROM inventory WHERE id = ?",
+      "SELECT id, quantity FROM inventory WHERE id = ? FOR UPDATE",
       [itemId]
     );
 
@@ -83,10 +89,20 @@ export async function deductInventoryForRequisitions(db, requisitions) {
       throw createInventoryError("INSUFFICIENT_STOCK", `Insufficient stock for item ${itemId}`);
     }
 
-    await db.execute(
-      "UPDATE inventory SET quantity = quantity - ? WHERE id = ?",
-      [quantityToDeduct, itemId]
+    // The WHERE clause repeats the availability condition so the statement is
+    // safe on its own terms, independent of the check above. RETURNING lets us
+    // confirm a row actually matched: none means the stock moved underneath us,
+    // which is reported as insufficient stock rather than silently ignored.
+    const [updatedRows] = await db.execute(
+      `UPDATE inventory SET quantity = quantity - ?
+       WHERE id = ? AND quantity >= ?
+       RETURNING id`,
+      [quantityToDeduct, itemId, quantityToDeduct]
     );
+
+    if (!updatedRows || updatedRows.length === 0) {
+      throw createInventoryError("INSUFFICIENT_STOCK", `Insufficient stock for item ${itemId}`);
+    }
   }
 }
 
