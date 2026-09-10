@@ -21,7 +21,8 @@ export function createInventoryRouter({ getDb, requireAuth, requireDatabase, log
     try {
       // L-1: Explicit columns
       const [rows] = await db.execute(
-        "SELECT id, name, category, type, quantity FROM inventory ORDER BY name LIMIT ? OFFSET ?",
+        `SELECT id, name, category, type, quantity, reorder_level, unit, updated_at
+         FROM inventory ORDER BY name LIMIT ? OFFSET ?`,
         [limit, offset]
       );
       res.json(rows);
@@ -103,7 +104,10 @@ export function createInventoryRouter({ getDb, requireAuth, requireDatabase, log
     }
 
     try {
-      await db.execute("UPDATE inventory SET quantity = ? WHERE id = ?", [quantity, id.trim()]);
+      await db.execute(
+        "UPDATE inventory SET quantity = ?, updated_at = NOW() WHERE id = ?",
+        [quantity, id.trim()]
+      );
 
       // H-5: Audit inventory update
       await logAudit(req.user.id, "update_item", id.trim(), JSON.stringify({ quantity }));

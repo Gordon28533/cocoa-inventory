@@ -94,7 +94,7 @@ export async function deductInventoryForRequisitions(db, requisitions) {
     // confirm a row actually matched: none means the stock moved underneath us,
     // which is reported as insufficient stock rather than silently ignored.
     const [updatedRows] = await db.execute(
-      `UPDATE inventory SET quantity = quantity - ?
+      `UPDATE inventory SET quantity = quantity - ?, updated_at = NOW()
        WHERE id = ? AND quantity >= ?
        RETURNING id`,
       [quantityToDeduct, itemId, quantityToDeduct]

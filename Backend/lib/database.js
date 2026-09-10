@@ -206,7 +206,8 @@ export function createDatabaseManager({ env = process.env, logger = console } = 
           unit          VARCHAR(50),
           reorder_level INTEGER      NOT NULL DEFAULT 0,
           description   TEXT,
-          created_at    TIMESTAMP    NOT NULL DEFAULT NOW()
+          created_at    TIMESTAMP    NOT NULL DEFAULT NOW(),
+          updated_at    TIMESTAMP    NOT NULL DEFAULT NOW()
         )
       `, []);
 
@@ -267,6 +268,16 @@ export function createDatabaseManager({ env = process.env, logger = console } = 
       // surfacing to the user as "Failed to add item".
       await runIfColumnMissing(db, "inventory",    "type",
         "ALTER TABLE inventory ADD COLUMN type VARCHAR(100)");
+      // InventoryList renders a "Last Updated" column from this value. Without
+      // it the field was permanently N/A. Existing rows are seeded from
+      // created_at rather than the migration timestamp, so the first render
+      // shows when the item was actually added instead of when the column was.
+      await runIfColumnMissing(db, "inventory",    "updated_at",
+        "ALTER TABLE inventory ADD COLUMN updated_at TIMESTAMP NOT NULL DEFAULT NOW()");
+      await db.execute(
+        "UPDATE inventory SET updated_at = created_at WHERE updated_at < created_at",
+        []
+      );
 
       // Final backstop against over-issue. Row locking in
       // deductInventoryForRequisitions already prevents concurrent fulfilments

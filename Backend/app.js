@@ -1,4 +1,6 @@
 import express from "express";
+import fs from "node:fs";
+import path from "node:path";
 import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
@@ -137,9 +139,27 @@ export function createBackendApp({
 
   app.use(apiNotFoundHandler);
 
-  if (buildDir) {
+  // Serve the single-page app only when a build is actually present.
+  //
+  // In this deployment the frontend is hosted on Vercel and the API runs alone
+  // on Render, so build/index.html does not exist there. Registering the
+  // fallback unconditionally meant every unmatched route tried to send a
+  // missing file, producing an ENOENT that surfaced as HTTP 500. A request for
+  // a route that does not exist should be a 404.
+  const indexHtml = buildDir ? path.join(buildDir, "index.html") : null;
+
+  if (indexHtml && fs.existsSync(indexHtml)) {
     app.get("*", (req, res) => {
-      res.sendFile(`${buildDir}/index.html`);
+      res.sendFile(indexHtml);
+    });
+  } else {
+    if (buildDir) {
+      logger.log(
+        "No frontend build found — API-only mode. Unmatched routes return 404."
+      );
+    }
+    app.get("*", (req, res) => {
+      res.status(404).json({ error: "Not found" });
     });
   }
 
