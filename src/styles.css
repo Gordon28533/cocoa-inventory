@@ -81,7 +81,11 @@ select:focus-visible {
   min-height: 100vh;
 }
 
-header {
+/* Scoped to the application banner. This was a bare `header` selector, which
+   styled every <header> element in the app — including the one inside the stock
+   alert panel, which inherited a 2rem-padded dark gradient banner and rendered
+   as a 100px navy block around a one-line label. */
+.app-header {
   background: linear-gradient(135deg, #22314b 0%, #31486e 100%);
   color: white;
   padding: 2rem;
@@ -1503,6 +1507,126 @@ tr:hover {
 .state-notice--warning {
   background: #fff8e1;
   color: #7a5800;
+}
+
+/* ── Stock alerts ──────────────────────────────────────────────────────────
+   The component was written with a full class structure but no stylesheet, so
+   every element fell back to browser defaults: no spacing between a badge and
+   the text beside it ("Low Stock1 item", "REFLECTIVE JACKETS5 unit(s)"), and
+   list items running flush together. Spacing here is done with flex gaps
+   rather than margins so the values hold regardless of element order. */
+.stock-alert {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.stock-alert__heading {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.stock-alert__title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;          /* the gap that was missing in "Stock Alerts2" */
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--color-text, #2a2a2a);
+}
+
+.stock-alert__badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.4rem;
+  height: 1.4rem;
+  padding: 0 0.45rem;
+  border-radius: 999px;
+  background: #9c4a2f;
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.stock-alert__subtitle {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #6e6259;
+}
+
+.stock-alert__group {
+  border: 1px solid #e6ded4;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.stock-alert__group + .stock-alert__group {
+  margin-top: 0.75rem;
+}
+
+/* Deliberately modest: a label strip, not a banner. */
+.stock-alert__group-header {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem 0.85rem;
+  background: #faf7f3;
+  border-bottom: 1px solid #eee6dc;
+}
+
+.stock-alert__group-count {
+  font-size: 0.8rem;
+  color: #6e6259;
+}
+
+.stock-alert__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.stock-alert__item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.55rem 0.85rem;
+  font-size: 0.88rem;
+}
+
+.stock-alert__item + .stock-alert__item {
+  border-top: 1px solid #f2ece4;
+}
+
+.stock-alert__item-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-weight: 600;
+  color: #2a2a2a;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stock-alert__item-qty {
+  flex: 0 0 auto;
+  color: #6e6259;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 640px) {
+  .stock-alert__item {
+    flex-wrap: wrap;
+    gap: 0.35rem 0.6rem;
+  }
+  .stock-alert__item-name {
+    flex: 1 0 100%;
+    white-space: normal;
+  }
 }
 
 /* ── Stock alert empty states ──────────────────────────────────────────────

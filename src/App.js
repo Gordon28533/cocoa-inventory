@@ -95,7 +95,7 @@ const AppContent = () => {
             Skip to main content
           </a>
           {token && (
-            <header>
+            <header className="app-header">
               <div className="header-content">
                 <img src="/enterprise-ims-logo.svg" alt="Enterprise Inventory System Logo" className="logo" />
                 <div className="header-text">
