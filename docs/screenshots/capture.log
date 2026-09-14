@@ -1,0 +1,14 @@
+Using browser: C:\Program Files\Google\Chrome\Application\chrome.exe
+Signed in as admin - admin
+  01  login                      signed out
+  02  inventory-list             tab: Inventory List
+  03  stock-alerts               tab: Notifications
+  04  requisition-form           tab: Requisition
+  05  my-requisitions            tab: My Requisitions
+  06  departments                tab: Departments
+  07  user-management            admin password gate
+  08  audit-log                  admin only
+  09  mobile-dashboard           390x844
+  10  mobile-login               390x844
+
+Saved to: C:\Users\PC\cocoa-inventory\docs\screenshots

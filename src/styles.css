@@ -1509,6 +1509,158 @@ tr:hover {
   color: #7a5800;
 }
 
+/* ── Audit log viewer ──────────────────────────────────────────────────────
+   Only .audit-table-wrap and .audit-table had styles; the other two dozen
+   classes had none. Most visibly, .audit-search-icon is an inline <svg> with
+   no intrinsic size, so it stretched to its container and rendered roughly
+   800px tall above the filters. */
+.audit-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.audit-header {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.audit-header__title {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: #22314b;
+}
+
+.audit-header__count {
+  font-size: 0.85rem;
+  color: #6b7280;
+}
+
+.audit-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1rem;
+  padding: 0.85rem 1rem;
+  background: #f8fafc;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+}
+
+.audit-search-wrap {
+  position: relative;
+  flex: 1 1 240px;
+  min-width: 200px;
+  display: flex;
+  align-items: center;
+}
+
+/* The fix for the oversized glyph: fixed box, taken out of flow. */
+.audit-search-icon {
+  position: absolute;
+  left: 0.6rem;
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  pointer-events: none;
+  stroke: #9ca3af;
+  stroke-width: 1.6;
+}
+
+.audit-search {
+  width: 100%;
+  padding: 0.45rem 0.6rem 0.45rem 2rem;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 0.88rem;
+  background: #fff;
+}
+
+.audit-date-range,
+.audit-shortcuts,
+.audit-tools {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.audit-tools {
+  margin-left: auto;          /* push export to the right edge */
+}
+
+.audit-date-label,
+.audit-pagesize-label {
+  font-size: 0.8rem;
+  color: #6b7280;
+  white-space: nowrap;
+}
+
+.audit-date-input,
+.audit-pagesize {
+  padding: 0.35rem 0.5rem;
+  border: 1px solid #d1d5db;
+  border-radius: 7px;
+  font-size: 0.85rem;
+  background: #fff;
+  color: #1f2937;
+}
+
+.audit-action {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  background: #eef2ff;
+  color: #3730a3;
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.audit-action--login          { background: #eef2ff; color: #3730a3; }
+.audit-action--create_item,
+.audit-action--create_user,
+.audit-action--create_requisition { background: #ecfdf5; color: #065f46; }
+.audit-action--fulfill        { background: #f0fdf4; color: #14532d; }
+.audit-action--reject         { background: #fef2f2; color: #991b1b; }
+.audit-action--delete_item,
+.audit-action--delete_user    { background: #fef2f2; color: #991b1b; }
+
+.audit-table__id   { color: #9ca3af; font-variant-numeric: tabular-nums; }
+.audit-table__user { font-weight: 600; color: #1f2937; }
+.audit-table__req-id { font-variant-numeric: tabular-nums; color: #374151; }
+.audit-table__na   { color: #d1d5db; }
+.audit-table__ts   { white-space: nowrap; color: #6b7280; font-size: 0.85rem; }
+
+.audit-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  padding-top: 0.25rem;
+}
+
+.audit-pagination__info {
+  font-size: 0.82rem;
+  color: #6b7280;
+}
+
+.audit-pagination__controls {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 640px) {
+  .audit-tools { margin-left: 0; }
+  .audit-controls { gap: 0.6rem; }
+}
+
 /* ── Stock alerts ──────────────────────────────────────────────────────────
    The component was written with a full class structure but no stylesheet, so
    every element fell back to browser defaults: no spacing between a badge and
