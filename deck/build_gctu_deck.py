@@ -286,17 +286,23 @@ add_body(S[8], [
     (1, "Authentication is stateless: a signed JWT carries identity, but the user's "
         "role is re-read from the database on every request, so a revoked or "
         "changed role takes effect immediately.", False),
-    (0, "Data model — six core tables", True),
-    (1, "users, departments, inventory, requisitions, requisition_items, audit_logs.", False),
+    (0, "Data model — five tables", True),
+    (1, "departments, users, inventory, requisitions, audit_logs.", False),
+    (1, "A multi-item request is stored as one row per line item, all sharing a "
+        "batch_id, rather than a header row plus a junction table — so each line "
+        "carries its own status and approver and can be decided individually.", False),
     (1, "Integrity is enforced in the database: foreign keys between requisitions, "
         "items and departments; a uniqueness constraint on Staff ID; and a CHECK "
         "constraint that forbids a negative stock quantity.", False),
-], size=16, gap=6)
-notes(S[8], "Two points examiners reliably probe. First, why re-read the role rather "
-            "than trust the token — because a token issued before a demotion would "
-            "otherwise stay privileged until it expired. Second, why a CHECK "
+], size=15, gap=5)
+notes(S[8], "Three points examiners reliably probe. First, why re-read the role "
+            "rather than trust the token — because a token issued before a demotion "
+            "would otherwise stay privileged until it expired. Second, why a CHECK "
             "constraint as well as application logic — because the constraint holds "
-            "even if a future code path forgets to check.")
+            "even if a future code path forgets to check. Third, why no "
+            "requisition_items junction table — because per-line status and approver "
+            "columns allow item-by-item decisions; the cost is that request-level "
+            "attributes repeat on every line of a batch.")
 
 # ---------------------------------------------------------------- 10. Design 2
 set_title(S[9], "SYSTEM DESIGN — APPROVAL WORKFLOWS")
