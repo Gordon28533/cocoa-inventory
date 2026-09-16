@@ -296,7 +296,12 @@ describe("/requisitions routes", () => {
 
         if (sql.includes("FROM requisitions WHERE id = ?")) {
           assert.deepEqual(params, [44]);
-          return [[{ id: 44, status: "pending", department_id: 9, department: "Operations", is_it_item: 0 }]];
+          // is_head_office must be stated: an HOD only has a step in the head
+          // office chain. This fixture previously omitted the flag, so it read
+          // as undefined and the case silently asserted that an HOD may approve
+          // a requisition of unspecified origin — which is what allowed the
+          // branch-bypass defect to pass review.
+          return [[{ id: 44, status: "pending", department_id: 9, department: "Operations", is_head_office: 1, is_it_item: 0 }]];
         }
 
         if (sql.startsWith("UPDATE requisitions SET")) {
@@ -787,5 +792,156 @@ describe("/requisitions routes", () => {
         assert.equal(data.unique_code, "LOOK123");
       }
     );
+  });
+
+  // Branch requisitions are routed Accounts -> Accounts Manager. An HOD has no
+  // step in that chain at all. Before the is_head_office test was added to the
+  // pending/HOD transition, an HOD could advance a branch requisition straight
+  // to hod_approved; since the Branch Accounts step only accepts requisitions at
+  // status "pending", and nothing returns a requisition to pending, that step
+  // was then bypassed permanently. Every other approval test in this file uses
+  // is_head_office: 1, so the branch case went uncovered.
+  it("refuses to let an HOD approve a pending BRANCH requisition", async () => {
+    const token = createTestToken({ id: 5, role: "hod", department_id: 9 });
+    const writes = [];
+
+    const db = createMockDb({
+      async execute(sql, params) {
+        if (sql.includes("FROM requisitions WHERE id = ?")) {
+          return [[{ id: 40, status: "pending", department_id: 9, is_head_office: 0, is_it_item: 0 }]];
+        }
+        if (sql.startsWith("UPDATE requisitions SET")) {
+          writes.push(params);
+          return [[]];
+        }
+        if (sql.includes("INSERT INTO audit_logs")) return [[]];
+        throw new Error(`Unexpected SQL: ${sql}`);
+      }
+    });
+
+    await withTestApp(
+      { databaseManager: createMockDatabaseManager({ db }) },
+      async ({ baseUrl }) => {
+        const { response, data } = await fetchJson(baseUrl, "/requisitions/40/approve", {
+          method: "PUT",
+          headers: authHeaders(token),
+          body: JSON.stringify({})
+        });
+
+        assert.equal(response.status, 403);
+        // The refusal must name the chain that actually applies, so the approver
+        // learns who should be acting rather than only that they may not.
+        assert.match(data.message ?? data.error ?? "", /Branch: Accounts, then Accounts Manager/);
+      }
+    );
+
+    assert.equal(writes.length, 0, "no status may be written when approval is refused");
+  });
+
+  it("refuses to let an HOD reject a pending BRANCH requisition", async () => {
+    const token = createTestToken({ id: 5, role: "hod", department_id: 9 });
+    const writes = [];
+
+    const db = createMockDb({
+      async execute(sql, params) {
+        if (sql.includes("FROM requisitions WHERE id = ?")) {
+          return [[{ id: 41, status: "pending", department_id: 9, is_head_office: 0, is_it_item: 0 }]];
+        }
+        if (sql.startsWith("UPDATE requisitions SET")) {
+          writes.push(params);
+          return [[]];
+        }
+        if (sql.includes("INSERT INTO audit_logs")) return [[]];
+        throw new Error(`Unexpected SQL: ${sql}`);
+      }
+    });
+
+    await withTestApp(
+      { databaseManager: createMockDatabaseManager({ db }) },
+      async ({ baseUrl }) => {
+        const { response } = await fetchJson(baseUrl, "/requisitions/41/reject", {
+          method: "PUT",
+          headers: authHeaders(token),
+          body: JSON.stringify({ reason: "not needed" })
+        });
+
+        assert.equal(response.status, 403);
+      }
+    );
+
+    assert.equal(writes.length, 0, "no status may be written when rejection is refused");
+  });
+
+  // The complement: the guard must not over-correct and block the branch chain's
+  // own first approver.
+  it("still allows Accounts to approve a pending BRANCH requisition", async () => {
+    const token = createTestToken({ id: 6, role: "account", department_id: 9 });
+    const writes = [];
+
+    const db = createMockDb({
+      async execute(sql, params) {
+        if (sql.includes("FROM requisitions WHERE id = ?")) {
+          return [[{ id: 42, status: "pending", department_id: 9, is_head_office: 0, is_it_item: 0 }]];
+        }
+        if (sql.startsWith("UPDATE requisitions SET")) {
+          writes.push(params);
+          return [[]];
+        }
+        if (sql.includes("INSERT INTO audit_logs")) return [[]];
+        throw new Error(`Unexpected SQL: ${sql}`);
+      }
+    });
+
+    await withTestApp(
+      { databaseManager: createMockDatabaseManager({ db }) },
+      async ({ baseUrl }) => {
+        const { response, data } = await fetchJson(baseUrl, "/requisitions/42/approve", {
+          method: "PUT",
+          headers: authHeaders(token),
+          body: JSON.stringify({})
+        });
+
+        assert.equal(response.status, 200);
+        assert.equal(data.status, "branch_account_approved");
+      }
+    );
+
+    assert.equal(writes.length, 1, "the branch chain's first approval must still be written");
+  });
+
+  // And the head-office chain must be unaffected by the new condition.
+  it("still allows an HOD to approve a pending HEAD OFFICE requisition", async () => {
+    const token = createTestToken({ id: 5, role: "hod", department_id: 9 });
+    const writes = [];
+
+    const db = createMockDb({
+      async execute(sql, params) {
+        if (sql.includes("FROM requisitions WHERE id = ?")) {
+          return [[{ id: 43, status: "pending", department_id: 9, is_head_office: 1, is_it_item: 0 }]];
+        }
+        if (sql.startsWith("UPDATE requisitions SET")) {
+          writes.push(params);
+          return [[]];
+        }
+        if (sql.includes("INSERT INTO audit_logs")) return [[]];
+        throw new Error(`Unexpected SQL: ${sql}`);
+      }
+    });
+
+    await withTestApp(
+      { databaseManager: createMockDatabaseManager({ db }) },
+      async ({ baseUrl }) => {
+        const { response, data } = await fetchJson(baseUrl, "/requisitions/43/approve", {
+          method: "PUT",
+          headers: authHeaders(token),
+          body: JSON.stringify({})
+        });
+
+        assert.equal(response.status, 200);
+        assert.equal(data.status, "hod_approved");
+      }
+    );
+
+    assert.equal(writes.length, 1);
   });
 });

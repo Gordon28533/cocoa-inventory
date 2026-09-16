@@ -91,22 +91,26 @@ note("Each of these targets something genuinely soft in the project. The "
 
 q("Can a Head of Department approve a branch requisition? Walk me through what "
   "happens.")
-a("BE HONEST — THIS IS A LIVE DEFECT.", danger=True)
-a("The approval guard tests the requisition's status and the approver's role, "
-  "but the branch of the state machine that handles a pending requisition "
-  "checks only that the approver is an HOD or Deputy HOD — it does not also "
-  "check that the requisition originated at head office. So an HOD can advance "
-  "a pending branch requisition to hod_approved, and because the Branch "
-  "Accounts step only accepts requisitions at status pending, that step is then "
-  "skipped permanently.")
-a("Suggested answer: \"Yes — and it shouldn't. The guard checks role and status "
-  "but omits the head-office flag on that one branch, so a branch requisition "
-  "can be pulled into the head-office chain and bypass Branch Accounts. The fix "
-  "is a single additional condition on that transition. I found it while "
-  "reviewing the workflow against the design, and it's the first thing I would "
-  "correct.\"")
-note("Far better to name it yourself than to have them find it. If you fix it "
-     "before the defence, say so and describe the fix instead.")
+a("FIXED — AND THIS IS NOW ONE OF YOUR BEST ANSWERS.")
+a("Suggested answer: \"No, and that's enforced. The transition from pending to "
+  "hod_approved tests three things: the requisition's status, the approver's "
+  "role, and whether the requisition originated at head office. An HOD has no "
+  "step in the branch chain, so the attempt is refused with a 403 that names "
+  "the chain which does apply — Branch: Accounts, then Accounts Manager.\"")
+a("Then volunteer how you found it: \"It was actually a defect until I checked "
+  "the implementation against my own workflow design. The guard originally "
+  "tested role and status but not origin, so an HOD could pull a branch "
+  "requisition into the head-office chain — and because Branch Accounts only "
+  "accepts requisitions at status pending, and nothing ever returns one to "
+  "pending, that approval step was bypassed permanently. It was invisible "
+  "because every approval test in the suite used a head-office requisition. I "
+  "added four regression tests: two proving the branch case is refused, and two "
+  "proving the fix didn't over-correct and block the legitimate approvers.\"")
+note("This is a strong answer because it shows you can find a defect that the "
+     "tests, the code review and the running system all failed to surface. If "
+     "they ask how you verified the fix: the two refusal tests were confirmed to "
+     "fail with the fix reverted, so they genuinely test the guard rather than "
+     "passing by accident.")
 
 q("What makes your audit log tamper-evident?")
 a("BE CAREFUL — THE DOCUMENT OVERSTATES THIS.", danger=True)
@@ -287,7 +291,7 @@ for text, ans in [
 h("Implementation and testing", 2)
 for text, ans in [
     ("How many tests, and what do they cover?",
-     "Seventy: 37 backend across six files, 33 frontend across eleven. "
+     "Seventy-four: 41 backend across six files, 33 frontend across eleven. "
      "Authentication, departments, item authorisation, requisitions, users, "
      "server health, and the interface components. Know this number — it is in "
      "the dissertation and on the slide."),
@@ -406,16 +410,19 @@ h("5.  Before you walk in", 1)
 for item in [
     "Change the admin password. The system is on a public URL and the "
     "default admin123 still works — an examiner who opens the deployed site "
-    "could sign in as administrator.",
-    "Decide on the HOD / branch defect: fix it, or prepare to name it "
-    "yourself. Do not leave it to be discovered.",
+    "could sign in as administrator. This is the one item on this list that "
+    "is still outstanding.",
+    "Redraw Figure 3.4 if you can. The ER diagram shows a requisition_items "
+    "junction table that the implementation does not have; the surrounding "
+    "text now describes the real five-table design, but the figure still "
+    "shows the original conceptual model.",
     "Fill in the index number and supervisor name on the title slide.",
     "Rehearse the demo once with the network disconnected, so you know what "
     "you would say if it fails. The four screenshots on slide 12 are the "
     "fallback.",
     "Warm up the backend a few minutes before you present — a free-tier "
     "Render service sleeps when idle and the first request is slow.",
-    "Be able to state the test figure from memory: 70 tests, 37 backend and "
+    "Be able to state the test figure from memory: 74 tests, 41 backend and "
     "33 frontend, across 17 files.",
     "Re-read your own Chapter Five section 5.2. The objective-by-objective "
     "assessment is the most likely single question.",

@@ -210,7 +210,17 @@ export function createRequisitionRouter({ getDb, requireAuth, requireDatabase, l
         nextStatus  = "fulfilled";
         updateField = "fulfilled_by";
         action      = "fulfill";
-      } else if (first.status === "pending" && (user.role === "hod" || user.role === "deputy_hod")) {
+      } else if (
+        first.status === "pending" &&
+        (user.role === "hod" || user.role === "deputy_hod") &&
+        // The head-office test is not optional. Without it an HOD could advance
+        // a *branch* requisition from pending straight to hod_approved. Because
+        // the Branch Accounts step only accepts requisitions at status pending,
+        // and nothing ever returns a requisition to pending, that step would be
+        // skipped permanently — the branch chain's first approval silently
+        // bypassed by someone who has no part in that chain at all.
+        isHO
+      ) {
         nextStatus  = "hod_approved";
         updateField = "hod_approved_by";
         action      = "hod_approve";
@@ -285,9 +295,12 @@ export function createRequisitionRouter({ getDb, requireAuth, requireDatabase, l
 
       const isHO = first.is_head_office;
 
-      // Only the role that would approve at the current step may also reject it
+      // Only the role that would approve at the current step may also reject it.
+      // The head-office test on the HOD clause mirrors the approve endpoint: a
+      // branch requisition at pending belongs to Accounts, so an HOD must not be
+      // able to reject it either.
       const canReject =
-        (first.status === "pending" && (user.role === "hod" || user.role === "deputy_hod")) ||
+        (first.status === "pending" && (user.role === "hod" || user.role === "deputy_hod") && isHO) ||
         (first.status === "pending" && user.role === "account" && !isHO) ||
         (first.status === "branch_account_approved" && user.role === "account_manager") ||
         (first.status === "hod_approved" && user.role === "it_manager" && first.is_it_item) ||

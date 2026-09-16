@@ -382,7 +382,7 @@ set_title(S[12], "SYSTEM IMPLEMENTATION — TESTING")
 add_body(S[12], [
     "Seventeen test files: six exercising the backend and eleven exercising the "
     "React frontend.",
-    (0, "All seventy automated cases pass — 37 backend and 33 frontend.", True),
+    (0, "All seventy-four automated cases pass — 41 backend and 33 frontend.", True),
     "Backend tests run on the Node.js built-in test runner; frontend tests run on "
     "Jest with React Testing Library.",
     "Coverage spans authentication, departments, item authorisation, requisitions, "
@@ -390,14 +390,22 @@ add_body(S[12], [
     (0, "Reported honestly: the suite did not begin in this state. On first "
         "execution only 3 of 33 backend cases passed, because the tests had not "
         "been maintained through the authentication change and the PostgreSQL "
-        "migration. Repairing that drift itself uncovered defects — including a "
-        "batch-approval fault the stale suite had been hiding.", True),
-], size=15, gap=6)
+        "migration. Repairing that drift uncovered two real defects — a "
+        "batch-approval fault, and an approval guard that let a Head of "
+        "Department bypass the branch chain. Both are fixed, each covered by a "
+        "regression test verified to fail without the fix.", True),
+], size=14, gap=6)
 notes(S[12], "Do not skip the last bullet. Volunteering that the suite had rotted, "
-             "and that fixing it exposed a real defect, is far stronger than "
+             "and that fixing it exposed real defects, is far stronger than "
              "claiming everything passed first time — and it is what actually "
-             "happened. If asked for the defect: batch approve and reject rejected "
-             "the placeholder identifier the interface always sends.")
+             "happened. The two defects: batch approve and reject rejected the "
+             "placeholder identifier the interface always sends; and the pending "
+             "approval transition tested the approver's role without also testing "
+             "whether the requisition originated at head office, so an HOD could "
+             "pull a branch requisition into the head-office chain and skip Branch "
+             "Accounts permanently. The second was found by checking the code "
+             "against this deck's own workflow slide — a good answer if you are "
+             "asked how you assured quality.")
 
 # ---------------------------------------------------------------- 14. Conclusions
 set_title(S[13], "CONCLUSIONS AND RECOMMENDATIONS")
