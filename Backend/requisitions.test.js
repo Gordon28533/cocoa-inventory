@@ -123,7 +123,7 @@ describe("/requisitions routes", () => {
           return [[{ isActive: 1 }]];
         }
 
-        if (sql.includes("FROM requisitions WHERE requested_by = ?")) {
+        if (sql.includes("FROM requisitions r") && sql.includes("WHERE r.requested_by = ?")) {
           assert.equal(params[0], 22);
           return [[{ id: 5, requested_by: 22, status: "pending" }]];
         }
@@ -792,6 +792,54 @@ describe("/requisitions routes", () => {
         assert.equal(data.unique_code, "LOOK123");
       }
     );
+  });
+
+  // An approver cannot act on a stock code and a user id. The list query must
+  // resolve both to names, and must do so with LEFT joins so a requisition whose
+  // item or requester was later deleted still appears in the queue.
+  it("returns the item name and the requester's name to an approver", async () => {
+    const token = createTestToken({ id: 7, role: "hod", department_id: 3 });
+    let seen = "";
+
+    const db = createMockDb({
+      async execute(sql, params) {
+        if (sql.includes("FROM requisitions r")) {
+          seen = sql.replace(/\s+/g, " ");
+          assert.equal(params[0], 3, "an HOD's queue is scoped to their department");
+          return [[{
+            id: 12, item_id: "INV-7", quantity: 4, status: "pending",
+            requested_by: "31", department_id: 3, batch_id: "b-1",
+            item_name: "Toner Cartridge", item_unit: "box", item_category: "Consumables",
+            requested_by_name: "Ama Mensah", requested_by_staff_id: "CMC0031"
+          }]];
+        }
+        throw new Error(`Unexpected SQL: ${sql}`);
+      }
+    });
+
+    await withTestApp(
+      { databaseManager: createMockDatabaseManager({ db }) },
+      async ({ baseUrl }) => {
+        const { response, data } = await fetchJson(baseUrl, "/requisitions", {
+          headers: authHeaders(token)
+        });
+
+        assert.equal(response.status, 200);
+        assert.equal(data[0].item_name, "Toner Cartridge");
+        assert.equal(data[0].requested_by_name, "Ama Mensah");
+        assert.equal(data[0].requested_by_staff_id, "CMC0031");
+      }
+    );
+
+    assert.match(seen, /LEFT JOIN inventory i ON i\.id = r\.item_id/,
+      "item name must be resolved from inventory");
+    assert.match(seen, /LEFT JOIN users u ON u\.id::text = r\.requested_by/,
+      "requester name must be resolved from users, comparing as text");
+    assert.match(seen, /i\.name AS item_name/);
+    assert.match(seen, /u\."staffName" AS requested_by_name/);
+    // An INNER join would drop requisitions whose item or requester was deleted.
+    assert.ok(!/(?<!LEFT )\bJOIN\b/.test(seen.replace(/LEFT JOIN/g, "LEFT_JOIN")),
+      "both joins must be LEFT so rows survive a deleted item or requester");
   });
 
   // Branch requisitions are routed Accounts -> Accounts Manager. An HOD has no

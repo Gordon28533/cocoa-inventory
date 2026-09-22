@@ -135,22 +135,45 @@ export function createRequisitionRouter({ getDb, requireAuth, requireDatabase, l
     const offset = Math.max((parseInt(req.query.page) || 1) - 1, 0) * limit;
 
     try {
-      let query = `SELECT id, item_id, requested_by, department, department_id, quantity, status,
-                          unique_code, is_it_item, is_head_office, batch_id, created_at,
-                          hod_approved_by, branch_account_approved_by, ho_account_approved_by,
-                          it_approved_by, account_approved_by, fulfilled_by, rejected_by
-                   FROM requisitions`;
+      // An approver needs to see WHAT was requested and BY WHOM. Both were
+      // stored as opaque keys: item_id is the stock code ("INV-1") and
+      // requested_by holds the requester's numeric user id as text. Without
+      // these joins an HOD's approval queue showed a stock code and a number,
+      // which is not enough information to approve or reject against.
+      //
+      // Both joins are LEFT so that a requisition still lists if its item was
+      // later deleted from inventory or its requester was removed — the name
+      // comes back null rather than the whole row disappearing from the queue.
+      //
+      // requested_by is VARCHAR and users.id is an integer, so the comparison
+      // casts the id to text rather than the column to an integer: older rows
+      // may hold a non-numeric value, and casting those to integer would abort
+      // the whole query instead of simply not matching.
+      let query = `SELECT r.id, r.item_id, r.requested_by, r.department, r.department_id,
+                          r.quantity, r.status, r.unique_code, r.is_it_item,
+                          r.is_head_office, r.batch_id, r.created_at,
+                          r.hod_approved_by, r.branch_account_approved_by,
+                          r.ho_account_approved_by, r.it_approved_by,
+                          r.account_approved_by, r.fulfilled_by, r.rejected_by,
+                          i.name AS item_name,
+                          i.unit AS item_unit,
+                          i.category AS item_category,
+                          u."staffName" AS requested_by_name,
+                          u."staffId"   AS requested_by_staff_id
+                   FROM requisitions r
+                   LEFT JOIN inventory i ON i.id = r.item_id
+                   LEFT JOIN users u ON u.id::text = r.requested_by`;
       const params = [];
 
       if (req.user.role === "user") {
-        query += " WHERE requested_by = ?";
+        query += " WHERE r.requested_by = ?";
         params.push(req.user.id);
       } else if (DEPARTMENT_APPROVER_ROLES.has(req.user.role)) {
-        query += " WHERE department_id = ?";
+        query += " WHERE r.department_id = ?";
         params.push(req.user.department_id);
       }
 
-      query += " ORDER BY created_at DESC LIMIT ? OFFSET ?";
+      query += " ORDER BY r.created_at DESC LIMIT ? OFFSET ?";
       params.push(limit, offset);
       const [rows] = await db.execute(query, params);
       res.json(rows);

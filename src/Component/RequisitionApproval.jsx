@@ -21,21 +21,41 @@ const groupByBatch = (requisitions) => {
   return [...map.entries()].map(([batchId, items]) => ({ batchId, items }));
 };
 
+/** The requester's name, falling back through what the row actually carries. */
+export const requesterLabel = (item) => {
+  const name = item?.requested_by_name;
+  const staffId = item?.requested_by_staff_id;
+  if (name && staffId) return `${name} (${staffId})`;
+  if (name) return name;
+  if (staffId) return staffId;
+  // Pre-join rows, or a requester since removed: requested_by holds the raw id.
+  return item?.requested_by ? `User ${item.requested_by}` : "Unknown requester";
+};
+
+// A CSV cell containing a comma would otherwise split into two columns, which
+// matters now that item and requester names are free text.
+const csvCell = (value) => {
+  const s = value === null || value === undefined ? "" : String(value);
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+};
+
 const exportBatchCSV = (batches) => {
-  const rows = [["Batch ID", "Item", "Qty", "Dept", "Status", "Submitted"]];
+  const rows = [["Batch ID", "Item", "Qty", "Requested By", "Staff ID", "Dept", "Status", "Submitted"]];
   for (const { batchId, items } of batches) {
     for (const item of items) {
       rows.push([
         batchId,
-        item.item_name ?? item.name ?? item.id,
+        item.item_name ?? item.name ?? item.item_id ?? item.id,
         item.quantity,
-        item.department_name ?? item.department_id,
+        item.requested_by_name ?? "",
+        item.requested_by_staff_id ?? "",
+        item.department_name ?? item.department ?? item.department_id,
         getStatusLabel(item.status),
         formatDate(item.created_at),
       ]);
     }
   }
-  const csv = rows.map((r) => r.join(",")).join("\n");
+  const csv = rows.map((r) => r.map(csvCell).join(",")).join("\n");
   const a = Object.assign(document.createElement("a"), {
     href: URL.createObjectURL(new Blob([csv], { type: "text/csv" })),
     download: `requisitions-${Date.now()}.csv`,
@@ -157,7 +177,11 @@ const RequisitionApproval = () => {
         items.some(
           (i) =>
             (i.item_name ?? i.name ?? "").toLowerCase().includes(q) ||
-            (i.department_name ?? "").toLowerCase().includes(q)
+            (i.department_name ?? i.department ?? "").toLowerCase().includes(q) ||
+            // An approver looking for "whose request was that?" searches by
+            // person at least as often as by item.
+            (i.requested_by_name ?? "").toLowerCase().includes(q) ||
+            (i.requested_by_staff_id ?? "").toLowerCase().includes(q)
         )
       );
     }
@@ -242,6 +266,9 @@ const RequisitionApproval = () => {
                     </StatusBadge>
                   </div>
                   <div className="approval-card__info">
+                    <span className="approval-card__requester" title="Requested by">
+                      {requesterLabel(firstItem)}
+                    </span>
                     <span>{firstItem?.department_name ?? firstItem?.department ?? `Dept ${firstItem?.department_id}`}</span>
                     <span className="approval-card__date">{formatDate(firstItem?.created_at)}</span>
                   </div>
@@ -260,8 +287,16 @@ const RequisitionApproval = () => {
                     <tbody>
                       {items.map((item) => (
                         <tr key={item.id}>
-                          <td>{item.item_name ?? item.name ?? item.item_id ?? item.id}</td>
-                          <td>{item.quantity}</td>
+                          <td>
+                            {item.item_name ?? item.name ?? item.item_id ?? item.id}
+                            {item.item_name && item.item_id ? (
+                              <span className="approval-card__item-code"> {item.item_id}</span>
+                            ) : null}
+                          </td>
+                          <td>
+                            {item.quantity}
+                            {item.item_unit ? ` ${item.item_unit}` : ""}
+                          </td>
                           <td>
                             <span className={`status-chip status-chip--${item.status}`}>
                               {getStatusLabel(item.status)}

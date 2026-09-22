@@ -2866,6 +2866,78 @@ tr:hover {
   border-collapse: collapse;
 }
 
+/* ─── Approval queue ────────────────────────────────────────────────────────
+   The approval screen shipped with a full BEM class structure but only the two
+   table rules below, so every card rendered unstyled. These are the remaining
+   ten classes the component actually uses.                                    */
+.approval-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 1rem;
+}
+
+.approval-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-soft);
+  overflow: hidden;
+}
+
+.approval-card__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  padding: 0.85rem 1rem;
+  background: var(--color-surface-muted);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.approval-card__meta {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-width: 0;
+}
+
+.approval-card__batch-id {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.approval-card__info {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem 0.9rem;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  min-width: 0;
+}
+
+/* The requester is the first thing an approver looks for, so it carries the
+   strongest weight of the three header facts. */
+.approval-card__requester {
+  font-weight: 600;
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 22ch;
+}
+
+.approval-card__date {
+  white-space: nowrap;
+}
+
 /* ─── Approval card item table — responsive scroll ──────────────────────────── */
 .approval-card__table-wrap {
   overflow-x: auto;
@@ -2876,4 +2948,58 @@ tr:hover {
   min-width: 380px;
   width: 100%;
   border-collapse: collapse;
+}
+
+.approval-card__table th,
+.approval-card__table td {
+  padding: 0.55rem 1rem;
+  text-align: left;
+  border-bottom: 1px solid var(--color-border);
+  font-size: 0.9rem;
+  vertical-align: top;
+}
+
+.approval-card__table th {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+  background: var(--color-surface);
+}
+
+.approval-card__table tr:last-child td {
+  border-bottom: none;
+}
+
+/* The stock code stays visible next to the item name so an approver can still
+   quote it to Stores, without it competing with the name for attention. */
+.approval-card__item-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.approval-card__footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  background: var(--color-surface-muted);
+  border-top: 1px solid var(--color-border);
+}
+
+@media (max-width: 640px) {
+  .approval-card__header,
+  .approval-card__footer {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .approval-card__requester {
+    max-width: none;
+  }
 }
