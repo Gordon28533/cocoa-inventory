@@ -85,13 +85,17 @@ select:focus-visible {
    styled every <header> element in the app — including the one inside the stock
    alert panel, which inherited a 2rem-padded dark gradient banner and rendered
    as a 100px navy block around a one-line label. */
+/* A chrome bar, not a hero banner. At 2rem padding with a 2.5rem title this
+   stood 202px tall — over a fifth of a 900px viewport spent before any content,
+   which is what made the application read as a marketing page rather than an
+   operational tool. */
 .app-header {
   background: linear-gradient(135deg, #22314b 0%, #31486e 100%);
   color: white;
-  padding: 2rem;
-  margin-bottom: 30px;
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-medium);
+  padding: 0.8rem 1.4rem;
+  margin-bottom: 18px;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-soft);
 }
 
 .header-content {
@@ -103,8 +107,8 @@ select:focus-visible {
 }
 
 .logo {
-  width: 48px;
-  height: 48px;
+  width: 32px;
+  height: 32px;
   transition: transform 0.3s ease;
 }
 
@@ -116,16 +120,22 @@ select:focus-visible {
   text-align: left;
 }
 
-header h1 {
-  font-size: 2.5rem;
-  font-weight: 700;
-  margin-bottom: 0.5rem;
-  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+/* Scoped to .app-header. As bare `header h1` / `header p` these reached into
+   every <header> element in the application — including the group headers
+   inside the stock alert panel — which is the same leak that oversized the
+   alerts. The text-shadow is dropped: it dates the interface and does nothing
+   for legibility on a solid gradient. */
+.app-header h1 {
+  font-size: 1.2rem;
+  font-weight: 600;
+  margin: 0 0 0.1rem;
+  letter-spacing: 0.01em;
 }
 
-header p {
-  font-size: 1.1rem;
-  opacity: 0.9;
+.app-header p {
+  font-size: 0.8rem;
+  opacity: 0.85;
+  margin: 0;
 }
 
 .app-shell-controls {
@@ -458,7 +468,7 @@ header p {
 .dashboard-container h1 {
   color: var(--color-text);
   margin-bottom: 0;
-  font-size: 2.2rem;
+  font-size: 1.55rem;
   font-weight: 600;
 }
 
@@ -467,7 +477,7 @@ header p {
   justify-content: space-between;
   align-items: center;
   gap: 16px;
-  margin-bottom: 30px;
+  margin-bottom: 18px;
   flex-wrap: wrap;
 }
 
@@ -619,7 +629,7 @@ header p {
 .inventory-list__header h2 {
   color: var(--color-text);
   margin: 0;
-  font-size: 1.5rem;
+  font-size: 1.15rem;
   font-weight: 600;
 }
 
@@ -1013,8 +1023,9 @@ tr:hover {
 }
 
 .feature-panel__header h2 {
-  margin-bottom: 8px;
-  font-size: 1.8rem;
+  margin-bottom: 4px;
+  font-size: 1.15rem;
+  font-weight: 600;
 }
 
 .feature-grid {
