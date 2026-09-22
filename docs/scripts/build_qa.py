@@ -112,6 +112,27 @@ note("This is a strong answer because it shows you can find a defect that the "
      "fail with the fix reverted, so they genuinely test the guard rather than "
      "passing by accident.")
 
+q("Log in as someone in the IT department and raise a requisition. Which "
+  "approval chain does it take?")
+a("THE BRANCH CHAIN — AND THAT IS ALMOST CERTAINLY NOT WHAT YOU INTEND.", danger=True)
+a("The seed data creates eight departments and flags only 'Head Office' as "
+  "is_head_office = 1. IT, HR, Finance and Stores are all seeded with 0, so the "
+  "system treats them as branches. A requisition from the IT department is "
+  "therefore routed Accounts then Accounts Manager — it never reaches the HOD, "
+  "and an IT item from the IT department gets no IT Manager review.")
+a("If your demo raises a requisition from any of those four departments, the "
+  "behaviour will contradict your workflow slide in front of the examiner.")
+a("Suggested answer if asked: \"Those four are functional departments that sit "
+  "at head office, so they should carry the head-office flag; the seed sets it "
+  "only on the department literally named 'Head Office'. It's a seed-data "
+  "classification error rather than a fault in the routing logic — the routing "
+  "reads the flag correctly, the flag is set wrongly for those rows.\"")
+note("Decide this before you demo: either demonstrate from a Takeover Center "
+     "department (genuinely a branch, behaves correctly) or from Head Office, "
+     "and avoid IT/HR/Finance/Stores. The durable fix is to set is_head_office "
+     "= 1 for those four rows — but only you know CMC's real structure, so "
+     "confirm it before changing it.")
+
 q("A branch office orders a laptop. Does the IT Manager review it?")
 a("NO — AND THIS IS A REAL GAP IN THE ROUTING RULES.", danger=True)
 a("The three chains are selected by two flags. The branch chain is chosen on "
@@ -320,7 +341,7 @@ for text, ans in [
 h("Implementation and testing", 2)
 for text, ans in [
     ("How many tests, and what do they cover?",
-     "Seventy-four: 41 backend across six files, 33 frontend across eleven. "
+     "Seventy-five: 42 backend across six files, 33 frontend across eleven. "
      "Authentication, departments, item authorisation, requisitions, users, "
      "server health, and the interface components. Know this number — it is in "
      "the dissertation and on the slide."),
@@ -461,9 +482,17 @@ for item in [
     "Rehearse the demo once with the network disconnected, so you know what "
     "you would say if it fails. The four screenshots on slide 12 are the "
     "fallback.",
-    "Warm up the backend a few minutes before you present — a free-tier "
-    "Render service sleeps when idle and the first request is slow.",
-    "Be able to state the test figure from memory: 74 tests, 41 backend and "
+    "Warm up the backend BEFORE you present. This was measured, not "
+    "estimated: a cold request to the Render service took 43 seconds. If the "
+    "examiner opens your app cold, it will look broken. Load the site "
+    "yourself a few minutes beforehand and keep a tab open.",
+    "If asked about dependency security: the backend's own runtime packages "
+    "are patchable with a non-breaking npm audit fix (express and body-parser "
+    "advisories). The critical advisories are in build tooling and in "
+    "bcrypt's install-time chain, none of which ship to or run in the "
+    "deployed service. Do not run the fix in the days before your defence — "
+    "a lockfile change could break a working deployment.",
+    "Be able to state the test figure from memory: 75 tests, 42 backend and "
     "33 frontend, across 17 files.",
     "Re-read your own Chapter Five section 5.2. The objective-by-objective "
     "assessment is the most likely single question.",

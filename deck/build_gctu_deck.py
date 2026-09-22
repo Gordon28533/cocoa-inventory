@@ -390,7 +390,7 @@ set_title(S[12], "SYSTEM IMPLEMENTATION — TESTING")
 add_body(S[12], [
     "Seventeen test files: six exercising the backend and eleven exercising the "
     "React frontend.",
-    (0, "All seventy-four automated cases pass — 41 backend and 33 frontend.", True),
+    (0, "All seventy-five automated cases pass — 42 backend and 33 frontend.", True),
     "Backend tests run on the Node.js built-in test runner; frontend tests run on "
     "Jest with React Testing Library.",
     "Coverage spans authentication, departments, item authorisation, requisitions, "

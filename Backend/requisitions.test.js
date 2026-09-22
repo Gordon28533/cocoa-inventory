@@ -909,6 +909,51 @@ describe("/requisitions routes", () => {
     assert.equal(writes.length, 1, "the branch chain's first approval must still be written");
   });
 
+  // Fulfilment must never be reachable through the approve endpoint: that path
+  // would set status = fulfilled without deducting stock, because the deduction
+  // lives in the dedicated /fulfill handlers inside a transaction.
+  it("refuses to fulfil through the approve endpoint — stock would not be deducted", async () => {
+    const token = createTestToken({ id: 8, role: "stores", department_id: 9 });
+    const writes = [];
+
+    const db = createMockDb({
+      async execute(sql, params) {
+        if (sql.includes("FROM requisitions WHERE id = ?")) {
+          // The only state in which a requisition awaits Stores on the branch
+          // chain. is_head_office is 0 because ho_account_approved is reachable
+          // only from the branch transition.
+          return [[{ id: 44, status: "ho_account_approved", department_id: 9,
+                     is_head_office: 0, is_it_item: 0 }]];
+        }
+        if (sql.startsWith("UPDATE requisitions SET")) {
+          writes.push(params);
+          return [[]];
+        }
+        if (sql.includes("UPDATE inventory SET")) {
+          throw new Error("the approve endpoint must never touch inventory");
+        }
+        if (sql.includes("INSERT INTO audit_logs")) return [[]];
+        throw new Error(`Unexpected SQL: ${sql}`);
+      }
+    });
+
+    await withTestApp(
+      { databaseManager: createMockDatabaseManager({ db }) },
+      async ({ baseUrl }) => {
+        const { response } = await fetchJson(baseUrl, "/requisitions/44/approve", {
+          method: "PUT",
+          headers: authHeaders(token),
+          body: JSON.stringify({})
+        });
+
+        assert.equal(response.status, 403);
+      }
+    );
+
+    assert.equal(writes.length, 0,
+      "approve must not mark a requisition fulfilled; /fulfill does that inside a transaction");
+  });
+
   // And the head-office chain must be unaffected by the new condition.
   it("still allows an HOD to approve a pending HEAD OFFICE requisition", async () => {
     const token = createTestToken({ id: 5, role: "hod", department_id: 9 });
