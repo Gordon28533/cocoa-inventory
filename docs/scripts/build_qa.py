@@ -112,6 +112,22 @@ note("This is a strong answer because it shows you can find a defect that the "
      "fail with the fix reverted, so they genuinely test the guard rather than "
      "passing by accident.")
 
+q("A branch office orders a laptop. Does the IT Manager review it?")
+a("NO — AND THIS IS A REAL GAP IN THE ROUTING RULES.", danger=True)
+a("The three chains are selected by two flags. The branch chain is chosen on "
+  "is_head_office alone and does not consult is_it_item, so a branch IT "
+  "requisition goes Accounts then Accounts Manager and never reaches the IT "
+  "Manager. Only head-office IT items get the technical review.")
+a("Suggested answer: \"No, and it should. The routing tests the head-office flag "
+  "first, so a branch requisition takes the branch path whatever the item is — "
+  "which means an IT item ordered by a branch gets financial approval but no "
+  "technical review. It's a gap in the rules rather than a deliberate "
+  "exemption. I've recorded it as a limitation, and the fix is to let the "
+  "is_it_item flag insert the IT Manager step irrespective of origin.\"")
+note("Your document now records this as a limitation, so you are consistent if "
+     "they check. Naming it before they do is much stronger than conceding it "
+     "afterwards.")
+
 q("What makes your audit log tamper-evident?")
 a("BE CAREFUL — THE DOCUMENT OVERSTATES THIS.", danger=True)
 a("audit_logs is an ordinary table. The application only ever INSERTs into it, "
@@ -268,9 +284,22 @@ for text, ans in [
      "depends on, and RETURNING, which lets the guarded decrement confirm in "
      "one statement that a row matched."),
     ("Walk me through your ER diagram. What normal form is your schema in?",
-     "Six core tables: users, departments, inventory, requisitions, "
-     "requisition_items, audit_logs. Be ready to justify third normal form and "
-     "to point at a specific foreign key."),
+     "Five tables: departments, users, inventory, requisitions, audit_logs. "
+     "Foreign keys run from users and requisitions to departments, and from "
+     "audit_logs to users. Note what you should NOT claim: requisitions.item_id "
+     "has no foreign key to inventory, so referential integrity between a "
+     "requisition line and its item is not enforced by the database. If asked "
+     "why, the honest answer is that it was not added; adding it would be a "
+     "one-line improvement."),
+    ("Where is the junction table between requisitions and inventory items?",
+     "There isn't one, and that is deliberate. A multi-item request is stored "
+     "as one row per line item sharing a batch_id, so each line carries its own "
+     "status and approver columns and could be decided individually — which a "
+     "header row plus junction table would not allow. The cost is that "
+     "request-level attributes repeat on every line. Be aware that Figure 3.4 "
+     "still shows a junction table; if they point at it, say the figure is the "
+     "original conceptual model and the implemented design is the one described "
+     "in the text."),
     ("Why does a requisition store a department name as well as a department "
      "id? Isn't that redundant?",
      "A fair challenge — it is denormalised. Justify it as a historical "
@@ -296,8 +325,20 @@ for text, ans in [
      "server health, and the interface components. Know this number — it is in "
      "the dissertation and on the slide."),
     ("What is your test coverage percentage?",
-     "If you did not measure it, say so. Do not guess a number — they can ask "
-     "you to run the coverage tool."),
+     "\"I didn't measure it. No coverage instrumentation was run, so I don't "
+     "quote a figure. What I can tell you is exactly which behaviours the suite "
+     "exercises, and Appendix C also lists the three areas that carry no "
+     "automated coverage at all — concurrent access under load, end-to-end "
+     "browser testing, and the token refresh paths.\" Never invent a "
+     "percentage: they can ask you to run the tool in front of them."),
+
+    ("Do your tables use ENUM types or CHECK constraints for status and role?",
+     "Only one CHECK constraint exists, on inventory quantity. Status and role "
+     "are VARCHAR columns whose permitted values are enforced in application "
+     "code — the approval state machine for status, and roles.js for role. Say "
+     "that plainly; it is a reasonable design that you should not dress up as "
+     "database-level enforcement. If asked what it costs you: validity then "
+     "depends on every write path applying the check."),
     ("Why bcrypt at ten rounds rather than twelve?",
      "Ten balances brute-force resistance against login latency of roughly 80 "
      "to 120 milliseconds. The cost factor is configurable, so it can be raised "

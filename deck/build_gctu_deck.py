@@ -291,9 +291,10 @@ add_body(S[8], [
     (1, "A multi-item request is stored as one row per line item, all sharing a "
         "batch_id, rather than a header row plus a junction table — so each line "
         "carries its own status and approver and can be decided individually.", False),
-    (1, "Integrity is enforced in the database: foreign keys between requisitions, "
-        "items and departments; a uniqueness constraint on Staff ID; and a CHECK "
-        "constraint that forbids a negative stock quantity.", False),
+    (1, "Integrity is enforced in the database where it can be: foreign keys from "
+        "users and requisitions to departments and from the audit log to users; "
+        "uniqueness on both Staff ID and staff name; and a CHECK constraint "
+        "forbidding a negative stock quantity.", False),
 ], size=15, gap=5)
 notes(S[8], "Three points examiners reliably probe. First, why re-read the role "
             "rather than trust the token — because a token issued before a demotion "
@@ -310,9 +311,9 @@ add_body(S[9], [
     "Every requisition carries two flags — whether it originates at head office, "
     "and whether it is for an IT item. Those two flags select the approval chain "
     "automatically; the originator chooses nothing.",
-    (1, "Branch, general item  →  Accounts  →  Accounts Manager", True),
-    (1, "Head office, general item  →  HOD  →  Deputy HOD  →  Stores", True),
-    (1, "IT item  →  HOD  →  IT Manager  →  Stores", True),
+    (1, "Branch, any item  →  Accounts  →  Accounts Manager  →  Stores fulfils", True),
+    (1, "Head office, non-IT  →  HOD or Deputy HOD  →  Accounts Manager  →  Stores fulfils", True),
+    (1, "Head office, IT item  →  HOD or Deputy HOD  →  IT Manager  →  Accounts Manager  →  Stores fulfils", True),
     "The chain is implemented as a guarded state machine: each transition checks "
     "both the approver's role and the requisition's current status before it will "
     "advance.",
@@ -320,10 +321,17 @@ add_body(S[9], [
     "role, the request's current status, and the chain that actually applies — so "
     "the refusal is diagnostic rather than merely negative.",
 ], size=16, gap=6)
-notes(S[9], "This slide is the heart of the contribution. The examiner may ask what "
-            "happens if someone tries to skip a step — answer: the transition is "
-            "refused because the guard tests status as well as role, so a step "
-            "cannot be jumped even by someone who holds a valid approving role.")
+notes(S[9], "This slide is the heart of the contribution. If asked what happens when "
+            "someone tries to skip a step: the transition is refused, because the "
+            "guard tests status as well as role, so a step cannot be jumped even by "
+            "someone who holds a valid approving role. Note that HOD and Deputy HOD "
+            "share one step rather than forming two — either may take it, and taking "
+            "it advances the status so the other cannot act again. Be ready for one "
+            "sharp question: an IT item requested by a BRANCH follows the branch "
+            "path and so receives no IT Manager review. That is a genuine gap in the "
+            "routing rules, it is recorded as a limitation in Chapter One, and the "
+            "fix is to make the is_it_item flag trigger IT review irrespective of "
+            "origin.")
 
 # ---------------------------------------------------------------- 11. Implementation 1
 set_title(S[10], "SYSTEM IMPLEMENTATION")
