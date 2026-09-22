@@ -120,14 +120,21 @@ const InventoryList = ({ inventory, setInventory, onEditItem }) => {
         </div>
       </div>
 
+      {/* A compact inline notice, not a banner. This used to carry the
+          "stock-alert" class, which is the StockAlert component's own — the
+          two share no markup, so the shared name meant each was styled by the
+          other's rules. It now has a class of its own.
+          The item names sit on one line rather than in a bulleted list: this
+          sits directly above the table that already lists every item, so its
+          job is to say how many need attention, not to repeat the table. */}
       {lowStockItems.length > 0 && (
-        <div className="stock-alert">
-          <h3>Low Stock Alert ({lowStockItems.length} {lowStockItems.length === 1 ? "item" : "items"})</h3>
-          <ul>
-            {lowStockItems.map((i) => (
-              <li key={i.id}>{i.name} — {i.quantity} remaining</li>
-            ))}
-          </ul>
+        <div className="inventory-lowstock" role="status">
+          <span className="inventory-lowstock__count">
+            {lowStockItems.length} low
+          </span>
+          <span className="inventory-lowstock__names">
+            {lowStockItems.map((i) => `${i.name} (${i.quantity})`).join(", ")}
+          </span>
         </div>
       )}
 
