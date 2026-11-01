@@ -52,7 +52,7 @@ describe("RequisitionForm", () => {
       </AuthContext.Provider>
     );
 
-  // The form is a two-step wizard: Details (department, purpose, priority) then
+  // The form is a two-step wizard: Details (department, purpose, IT flag) then
   // Items (a table of rows, each with an item select and a quantity input).
   // Selecting an item means choosing it in a row's "Select item" dropdown, not
   // ticking a per-item checkbox as the previous single-page layout did.
@@ -111,12 +111,14 @@ describe("RequisitionForm", () => {
     fireEvent.click(screen.getByRole("button", { name: /Submit for Approval/i }));
 
     await waitFor(() => {
+      // No priority field: the form used to collect one and send it, but the
+      // backend never read it and the requisitions table has no column for it,
+      // so it was removed rather than left collecting input that went nowhere.
       expect(api.createRequisition).toHaveBeenCalledWith({
         items: [{ id: "INV-1", quantity: 3 }],
         department_id: 3,
         is_it_item: false,
-        purpose: "",
-        priority: "Normal"
+        purpose: ""
       });
     });
 

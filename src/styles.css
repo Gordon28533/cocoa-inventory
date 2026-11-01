@@ -2171,41 +2171,6 @@ tr:hover {
   box-shadow: var(--focus-ring);
 }
 
-/* Priority radios */
-.rq-priority {
-  border: none;
-  padding: 0;
-  margin: 0;
-}
-
-.rq-priority legend {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--color-text);
-  margin-bottom: 12px;
-}
-
-.rq-priority__options {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.rq-priority__option {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  cursor: pointer;
-  font-size: 14px;
-  color: var(--color-text);
-}
-
-.rq-priority__option input[type="radio"] {
-  accent-color: var(--color-brand);
-  width: 16px;
-  height: 16px;
-}
-
 /* Step 2 filters */
 .rq-filters {
   display: flex;
