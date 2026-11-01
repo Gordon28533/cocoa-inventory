@@ -125,7 +125,8 @@ export function createBackendApp({
       getDb,
       requireAuth,
       requireAdmin,
-      requireDatabase
+      requireDatabase,
+      logAudit
     })
   );
   app.use(

@@ -7,7 +7,17 @@ import {
 } from "../lib/httpResponses.js";
 import { ensureRequiredFields, hasText, parsePositiveInteger } from "../lib/validation.js";
 
-export function createDepartmentRouter({ getDb, requireAuth, requireAdmin, requireDatabase }) {
+// Department changes were the one administrative action with no audit trail at
+// all. They are not cosmetic: a requisition's approval chain is selected from
+// its department, so creating, renaming or deleting one alters how future
+// requests are routed and who is entitled to approve them.
+export function createDepartmentRouter({
+  getDb,
+  requireAuth,
+  requireAdmin,
+  requireDatabase,
+  logAudit = async () => {}
+}) {
   const router = express.Router();
 
   // C-3: requireAuth added — unauthenticated callers must not enumerate departments
@@ -44,6 +54,13 @@ export function createDepartmentRouter({ getDb, requireAuth, requireAdmin, requi
       const [result] = await db.execute(
         "INSERT INTO departments (name, description) VALUES (?, ?)",
         [name.trim(), description || null]
+      );
+
+      await logAudit(
+        req.user.id,
+        "create_department",
+        result.insertId,
+        JSON.stringify({ name: name.trim(), description: description || null })
       );
 
       res.status(201).json({
@@ -84,10 +101,28 @@ export function createDepartmentRouter({ getDb, requireAuth, requireAdmin, requi
     }
 
     try {
+      // Captured so the audit entry records a rename as before -> after, not
+      // merely that a department "was updated".
+      const [priorRows] = await db.execute(
+        "SELECT name, description FROM departments WHERE id = ?",
+        [departmentId]
+      );
+
       await db.execute(
         "UPDATE departments SET name = ?, description = ? WHERE id = ?",
         [name.trim(), description || null, departmentId]
       );
+
+      await logAudit(
+        req.user.id,
+        "update_department",
+        departmentId,
+        JSON.stringify({
+          previous: priorRows?.[0] ?? null,
+          updated: { name: name.trim(), description: description || null }
+        })
+      );
+
       res.json({ success: true, message: "Department updated successfully" });
     } catch (error) {
       logUnexpectedError(console, "Error updating department", error, { ignore: [isDuplicateEntryError] });
@@ -116,7 +151,20 @@ export function createDepartmentRouter({ getDb, requireAuth, requireAdmin, requi
         return badRequest(res, "Cannot delete department that has associated requisitions");
       }
 
-      await db.execute("DELETE FROM departments WHERE id = ?", [departmentId]);
+      // RETURNING captures what was removed: once the row is gone the audit
+      // entry is the only remaining record of what the department was called.
+      const [deleted] = await db.execute(
+        "DELETE FROM departments WHERE id = ? RETURNING name, description",
+        [departmentId]
+      );
+
+      await logAudit(
+        req.user.id,
+        "delete_department",
+        departmentId,
+        JSON.stringify({ deleted: deleted?.[0] ?? null })
+      );
+
       res.json({ success: true, message: "Department deleted successfully" });
     } catch (error) {
       logUnexpectedError(console, "Error deleting department", error);

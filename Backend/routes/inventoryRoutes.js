@@ -4,6 +4,7 @@ import {
   forbidden,
   isForeignKeyConstraintError,
   logUnexpectedError,
+  notFound,
   serverError
 } from "../lib/httpResponses.js";
 import { canManageInventory } from "../lib/roles.js";
@@ -104,13 +105,45 @@ export function createInventoryRouter({ getDb, requireAuth, requireDatabase, log
     }
 
     try {
+      // The audit entry used to record only the new quantity, which cannot be
+      // read as an adjustment: "set to 500" says nothing about whether that was
+      // a correction of +400 or a write-off of -400. Read the prior value first
+      // so the entry carries both.
+      //
+      // Deliberately a plain SELECT then UPDATE rather than a single
+      // UPDATE ... FROM self-join. The single-statement form would close a
+      // narrow race where another writer changes the quantity in between, but
+      // this is a manual stock adjustment made by a person, not a contended
+      // path like fulfilment — which does use a row lock. The race would at
+      // worst record a slightly stale "previous"; getting the SQL wrong would
+      // break item updates outright on a live system.
+      const [priorRows] = await db.execute(
+        "SELECT quantity FROM inventory WHERE id = ?",
+        [id.trim()]
+      );
+
+      if (!priorRows || priorRows.length === 0) {
+        return notFound(res, "Item not found");
+      }
+
+      const previous = priorRows[0].quantity;
+
       await db.execute(
         "UPDATE inventory SET quantity = ?, updated_at = NOW() WHERE id = ?",
         [quantity, id.trim()]
       );
 
-      // H-5: Audit inventory update
-      await logAudit(req.user.id, "update_item", id.trim(), JSON.stringify({ quantity }));
+      // H-5: Audit inventory update, as a before/after adjustment.
+      await logAudit(
+        req.user.id,
+        "update_item",
+        id.trim(),
+        JSON.stringify({
+          previous_quantity: previous,
+          new_quantity: quantity,
+          delta: Number(quantity) - Number(previous)
+        })
+      );
 
       res.json({ success: true, message: "Item updated successfully" });
     } catch (error) {
