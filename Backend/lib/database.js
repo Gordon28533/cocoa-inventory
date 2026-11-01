@@ -145,6 +145,25 @@ export function createDatabaseManager({ env = process.env, logger = console } = 
   }
 
   /**
+   * Change a column's type only when it is not already the wanted type.
+   * Safe to call on every startup; the ALTER runs at most once.
+   */
+  async function runIfColumnType(db, table, column, wantedType, alterSql) {
+    const [rows] = await db.execute(
+      `SELECT data_type FROM information_schema.columns
+       WHERE table_schema = 'public' AND table_name = $1 AND column_name = $2`,
+      [table, column]
+    );
+    if (!rows.length) return;                       // column absent; nothing to convert
+    if (rows[0].data_type === wantedType) return;   // already converted
+
+    logger.log(
+      `Converting ${table}.${column} from ${rows[0].data_type} to ${wantedType}…`
+    );
+    await db.execute(alterSql, []);
+  }
+
+  /**
    * Add a named constraint only when it is not already present.
    * Any existing rows that violate it are repaired first, since ALTER TABLE
    * validates against current data and would otherwise fail on every boot.
@@ -240,7 +259,10 @@ export function createDatabaseManager({ env = process.env, logger = console } = 
           id             SERIAL       PRIMARY KEY,
           user_id        INTEGER      REFERENCES users(id) ON DELETE SET NULL,
           action         VARCHAR(100) NOT NULL,
-          requisition_id INTEGER,
+          -- Holds either a numeric requisition id or a hex batch_id, so it must
+          -- be textual. As INTEGER it silently discarded every batch-scoped
+          -- entry: the whole requisition lifecycle went unaudited.
+          requisition_id VARCHAR(64),
           details        TEXT,
           timestamp      TIMESTAMP    NOT NULL DEFAULT NOW()
         )
@@ -262,6 +284,19 @@ export function createDatabaseManager({ env = process.env, logger = console } = 
         "ALTER TABLE requisitions ADD COLUMN is_head_office SMALLINT NOT NULL DEFAULT 0");
       await runIfColumnMissing(db, "audit_logs",   "details",
         "ALTER TABLE audit_logs ADD COLUMN details TEXT NULL");
+
+      // audit_logs.requisition_id was INTEGER, but every requisition-lifecycle
+      // action logs a batch_id — a 12-character hex string from
+      // crypto.randomBytes(6). PostgreSQL rejected those with "invalid input
+      // syntax for type integer", logAudit caught the error and continued, and
+      // the approval still succeeded. The result: creation, approval, rejection
+      // and fulfilment were NEVER written to the audit log, while user and
+      // password actions (numeric or null ids) were — which is why the table
+      // looked populated. Widening the column makes the identifier match what
+      // the application actually logs. Existing integer values cast cleanly.
+      await runIfColumnType(db, "audit_logs", "requisition_id", "character varying",
+        "ALTER TABLE audit_logs ALTER COLUMN requisition_id TYPE VARCHAR(64) " +
+        "USING requisition_id::text");
       // inventoryRoutes both SELECTs and INSERTs an item "type", but the column
       // was never in the original CREATE TABLE. Without it, GET /items and
       // POST /items both fail with 'column "type" does not exist' — the latter

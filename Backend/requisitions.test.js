@@ -794,6 +794,51 @@ describe("/requisitions routes", () => {
     );
   });
 
+  // Approving a batch must leave an accountability record. For the whole pilot
+  // it did not: audit_logs.requisition_id was INTEGER, every requisition action
+  // logs a hex batch_id, PostgreSQL rejected the INSERT, and logAudit swallowed
+  // the error — so the approval returned 200 with no audit row behind it. The
+  // column is textual now; this asserts the entry is written and carries the
+  // batch id, so the regression cannot return unnoticed.
+  it("writes an audit entry carrying the batch id when a batch is approved", async () => {
+    const token = createTestToken({ id: 5, role: "hod", department_id: 9 });
+    const audits = [];
+
+    const db = createMockDb({
+      async execute(sql, params) {
+        if (sql.includes("FROM requisitions WHERE batch_id = ?")) {
+          return [[{ id: 31, status: "pending", department_id: 9, is_head_office: 1, is_it_item: 0 }]];
+        }
+        if (sql.startsWith("UPDATE requisitions SET")) return [[]];
+        if (sql.includes("INSERT INTO audit_logs")) {
+          audits.push(params);
+          return [[]];
+        }
+        throw new Error(`Unexpected SQL: ${sql}`);
+      }
+    });
+
+    await withTestApp(
+      { databaseManager: createMockDatabaseManager({ db }) },
+      async ({ baseUrl }) => {
+        const { response } = await fetchJson(baseUrl, "/requisitions/0/approve", {
+          method: "PUT",
+          headers: authHeaders(token),
+          // A real batch_id: 12 hex characters from crypto.randomBytes(6).
+          body: JSON.stringify({ batch_id: "43aae029d945" })
+        });
+        assert.equal(response.status, 200);
+      }
+    );
+
+    assert.equal(audits.length, 1, "approving a batch must write exactly one audit entry");
+    const [userId, action, entityId] = audits[0];
+    assert.equal(userId, 5);
+    assert.equal(action, "hod_approve");
+    assert.equal(entityId, "43aae029d945",
+      "the audit entry must record the batch id, as a string");
+  });
+
   // An approver cannot act on a stock code and a user id. The list query must
   // resolve both to names, and must do so with LEFT joins so a requisition whose
   // item or requester was later deleted still appears in the queue.
