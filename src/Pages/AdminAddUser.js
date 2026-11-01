@@ -365,7 +365,6 @@ const AdminAddUser = () => {
       <div className="admin-security-shell">
         <div className="form-container admin-security-card">
           <h2>Admin Password Required</h2>
-          <p className="section-subtitle">Confirm your password before opening staff administration tools.</p>
           <form onSubmit={handlePasswordSubmit} className="admin-security-form" aria-busy={passwordChecking}>
             {!adminStaffId && (
               <label className="form-group" htmlFor="adminStaffIdInput">
@@ -423,7 +422,6 @@ const AdminAddUser = () => {
       <div className="feature-panel__header">
         <div>
           <h2>User Management</h2>
-          <p className="section-subtitle">Create staff accounts, manage approval roles, and keep branch setup complete.</p>
         </div>
       </div>
 
@@ -441,7 +439,6 @@ const AdminAddUser = () => {
         <div className="feature-card__header">
           <div>
             <h3>Add User</h3>
-            <p className="section-subtitle">Create new staff accounts and assign the right role and department from the start.</p>
           </div>
         </div>
         <p id={createUserHelpId} className="field-help">
@@ -538,7 +535,6 @@ const AdminAddUser = () => {
         <div className="feature-card__header">
           <div>
             <h3>All Users</h3>
-            <p className="section-subtitle">Review access across the organization and deactivate stale accounts when needed.</p>
           </div>
         </div>
 
@@ -628,7 +624,6 @@ const AdminAddUser = () => {
         <div className="feature-card__header">
           <div>
             <h3>System Reports</h3>
-            <p className="section-subtitle">Aggregate snapshot of inventory, requisitions, and user accounts.</p>
           </div>
           <button type="button" className="btn btn-secondary" onClick={fetchReportData} disabled={reportLoading}>
             {reportLoading ? "Loading…" : "Refresh"}
@@ -815,7 +810,6 @@ const AdminAddUser = () => {
           <div className="feature-card__header">
             <div>
               <h3>Audit Logs</h3>
-              <p className="section-subtitle">Inspect notable system activity and recent account actions.</p>
             </div>
           </div>
           <AuditLogViewer />
@@ -827,7 +821,6 @@ const AdminAddUser = () => {
           <div className="feature-card__header">
             <div>
               <h3>Department Management</h3>
-              <p className="section-subtitle">Maintain the department list used by routing, approvals, and user assignments.</p>
             </div>
           </div>
           <DepartmentManager />
@@ -838,7 +831,6 @@ const AdminAddUser = () => {
         <div className="feature-card__header">
           <div>
             <h3>Change My Password</h3>
-            <p className="section-subtitle">Keep your own admin access secure without leaving the management workspace.</p>
           </div>
         </div>
         <p id={changePasswordHelpId} className="field-help">

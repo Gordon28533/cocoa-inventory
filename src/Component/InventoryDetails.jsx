@@ -49,9 +49,6 @@ const InventoryDetails = ({ inventory }) => {
           <div>
             <p className="inventory-details__eyebrow">Inventory Item</p>
             <h2>{item.name}</h2>
-            <p className="inventory-details__subtitle">
-              Review the current stock position, category, and last update before returning to the workspace.
-            </p>
           </div>
           <StatusBadge label={stockMeta.label} variant={stockMeta.variant} />
         </div>

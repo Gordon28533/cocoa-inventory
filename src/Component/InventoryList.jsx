@@ -84,7 +84,6 @@ const InventoryList = ({ inventory, setInventory, onEditItem }) => {
         <div className="section-header">
           <div>
             <h2>Inventory Management</h2>
-            <p className="section-subtitle">Review stock levels, open item details, and keep inventory records current.</p>
           </div>
           <div className="summary-text inventory-list__summary">Total Items: {inventory.length}</div>
         </div>

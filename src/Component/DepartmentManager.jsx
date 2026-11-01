@@ -84,7 +84,6 @@ const DepartmentManager = ({ setNotification }) => {
       <div className="feature-panel__header">
         <div>
           <h3>Department Management</h3>
-          <p className="section-subtitle">Add, edit, and retire departments used for routing, approvals, and user assignment.</p>
         </div>
       </div>
 

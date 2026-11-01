@@ -214,7 +214,6 @@ const MyRequisitions = ({ inventory }) => {
       <div className="section-header">
         <div>
           <h2>My Requisitions</h2>
-          <p className="section-subtitle">Track your submitted batches, approval progress, and pickup codes.</p>
         </div>
         <button
           className="btn btn-secondary"

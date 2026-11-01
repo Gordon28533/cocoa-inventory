@@ -103,9 +103,10 @@ const NotificationsPanel = ({ inventory }) => {
 
   const stockAlertCount = outItems.length + lowItems.length + mediumItems.length;
 
-  const totalAlerts =
-    (showStock    ? stockAlertCount : 0) +
-    (showApprovals ? pendingBatches.length : 0);
+  // A combined total used to live here, for a "N items need your attention"
+  // line under the panel heading. That line was narration — each section
+  // already shows its own count beside its own heading — so the total has no
+  // remaining reader.
 
   return (
     <div className="feature-panel">
@@ -114,11 +115,6 @@ const NotificationsPanel = ({ inventory }) => {
       <div className="feature-panel__header">
         <div>
           <h2>Notifications</h2>
-          <p className="section-subtitle">
-            {totalAlerts > 0
-              ? `${totalAlerts} item${totalAlerts !== 1 ? "s" : ""} need${totalAlerts === 1 ? "s" : ""} your attention.`
-              : "You're all caught up."}
-          </p>
         </div>
         <button
           type="button"

@@ -17,7 +17,9 @@ describe("LoginPage", () => {
   it("renders the login form fields", () => {
     renderLoginPage();
 
-    expect(screen.getByText(/Welcome Back/i)).toBeInTheDocument();
+    // The card heading reads "Sign in" rather than "Welcome Back": the greeting
+    // belonged to the consumer-style voice that was stripped from the interface.
+    expect(screen.getByRole("heading", { name: /Sign in/i })).toBeInTheDocument();
     // Authentication is by employee number, so the field is "Employee ID".
     expect(screen.getByLabelText(/Employee ID/i)).toBeInTheDocument();
     expect(screen.getByPlaceholderText("Password")).toBeInTheDocument();

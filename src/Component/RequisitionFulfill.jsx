@@ -209,9 +209,6 @@ const RequisitionFulfill = ({ setNotification, inventory }) => {
       <div className="feature-panel__header">
         <div>
           <h2>Fulfill Requisition</h2>
-          <p className="section-subtitle">
-            Track batches still awaiting approval, open ready batches, and verify pickup details before fulfillment.
-          </p>
         </div>
         <button type="button" className="btn btn-secondary" onClick={fetchBatches} disabled={isLoading}>
           Refresh
@@ -223,7 +220,6 @@ const RequisitionFulfill = ({ setNotification, inventory }) => {
           <div className="feature-card__header">
             <div>
               <h3>Batches requested</h3>
-              <p className="section-subtitle">These batches are still moving through the approval chain.</p>
             </div>
           </div>
           {isLoading ? (
@@ -279,7 +275,6 @@ const RequisitionFulfill = ({ setNotification, inventory }) => {
           <div className="feature-card__header">
             <div>
               <h3>Batches ready to fulfill</h3>
-              <p className="section-subtitle">These batches are approved and ready for code verification.</p>
             </div>
           </div>
           {isLoading ? (
@@ -336,7 +331,6 @@ const RequisitionFulfill = ({ setNotification, inventory }) => {
         <div className="feature-card__header">
           <div>
             <h3>Lookup by Code</h3>
-            <p className="section-subtitle">Paste a pickup code to locate the matching batch and verify the receiver.</p>
           </div>
         </div>
 

@@ -49,7 +49,7 @@ const Dashboard = ({
   setInventory,
   isLoading = false
 }) => {
-  const { token, user, role: userRole, currentPath, setCurrentPath } = useAuth();
+  const { token, role: userRole, currentPath, setCurrentPath } = useAuth();
   const [activeTab, setActiveTab] = useState(() => {
     if (currentPath && currentPath.includes("tab=")) {
       const params = new URLSearchParams(currentPath.split("?")[1]);
@@ -189,12 +189,6 @@ const Dashboard = ({
       <div className="dashboard-header">
         <div>
           <h1>Inventory Dashboard</h1>
-          <p className="dashboard-welcome">
-            Welcome back, {user || "team member"}! Manage your inventory efficiently.
-          </p>
-          <p className="dashboard-subtitle">
-            Use the tabs below to move between inventory, requisitions, approvals, fulfillment, and administration tasks.
-          </p>
         </div>
       </div>
 

@@ -58,7 +58,6 @@ const ChangePasswordPage = () => {
   return (
     <div className="login-container page-form-shell">
       <h2>Change Password</h2>
-      <p className="login-subtitle">Update your account password before returning to the workspace.</p>
       <p id={helperId} className="field-help field-help--centered">
         Choose a strong new password and confirm it before saving.
       </p>

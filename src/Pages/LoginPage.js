@@ -99,7 +99,7 @@ const LoginPage = () => {
             <img src="/enterprise-ims-logo.svg" alt="Enterprise Inventory System" />
           </div>
           <p className="login-brand">Enterprise Inventory System</p>
-          <h2 id={subtitleId}>Welcome Back</h2>
+          <h2 id={subtitleId}>Sign in</h2>
 
           {error && (
             <div id="login-error" className="error login-error" role="alert">
